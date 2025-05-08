@@ -1,0 +1,225 @@
+{# templates/static.html #}
+{% extends "base.html" %}
+
+{% block title %}Static IPs{% endblock %}
+
+{% block head %}
+  {{ super() }}
+  <!-- DataTables CSS -->
+  <link
+    href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css"
+    rel="stylesheet">
+  <link
+    href="https://cdn.datatables.net/rowgroup/1.3.0/css/rowGroup.bootstrap5.min.css"
+    rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-hdd-network me-2"></i>Users IP Management</h2>
+  <button id="addNew" class="btn btn-primary">
+    <i class="bi bi-plus-lg"></i> Add new User IP
+  </button>
+</div>
+
+<div class="card">
+  <div class="card-header">Entries</div>
+  <div class="card-body p-0">
+    <table id="statTable" class="table table-striped mb-0 w-100">
+      <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>Naos ID</th>
+          <th>Dept</th>
+          <th>Device</th>
+          <th>IP</th>
+          <th>MAC</th>
+          <th>Asset Tag</th>
+          <th>Added</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal fade" id="staticModal" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header">
+      <h5 class="modal-title">Add / Edit Static IP Entry</h5>
+      <button class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editEntryId">
+      <div class="row mb-3">
+        <div class="col"><label>Name</label><input id="sname" class="form-control"></div>
+        <div class="col"><label>Naos ID</label><input id="snaos" class="form-control"></div>
+        <div class="col"><label>Department</label><input id="sdept" class="form-control"></div>
+      </div>
+      <div id="devList"></div>
+      <button id="addDevRow" class="btn btn-outline-secondary btn-sm mb-3">
+        + Add Device / IP
+      </button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button id="saveAll" class="btn btn-primary">Save Entry</button>
+    </div>
+  </div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <!-- jQuery + DataTables JS -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+  <script src="https://cdn.datatables.net/rowgroup/1.3.0/js/dataTables.rowGroup.min.js"></script>
+
+  <script>
+  $(function(){
+    // 1) Initialize DataTable (added MAC & Asset Tag columns)
+    const table = $('#statTable').DataTable({
+      ajax: { url:'/api/static_flat', dataSrc: '' },
+      columns: [
+        { data: 'name' },
+        { data: 'naos_id' },
+        { data: 'department' },
+        { data: 'device' },
+        { data: 'ip' },
+        { data: 'mac_address' },
+        { data: 'asset_tag' },
+        { data: 'added_at' },
+        {
+          data: null, orderable: false,
+          render: r => `
+            <button class="btn btn-sm btn-warning me-1"
+                    onclick="openEdit(${r.entry_id})">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-sm btn-danger"
+                    onclick="deleteDevice(${r.entry_id},'${r.device}','${r.ip}')">
+              <i class="bi bi-trash"></i>
+            </button>`
+        }
+      ],
+      order: [[0,'asc']],
+      rowGroup: {
+        dataSrc: row => `${row.name}||${row.department}`,
+        startRender: (rows, group) => {
+          const [n,d] = group.split('||');
+          return $('<tr/>').append(
+            `<td colspan="9" class="fw-bold">${n} — ${d}</td>`
+          );
+        },
+        endRender: null
+      },
+      dom: '<"d-flex justify-content-between mb-2"f p>rt<"d-flex justify-content-end mt-2"p>',
+      language: {
+        paginate: { previous: '&lsaquo;', next: '&rsaquo;' }
+      }
+    });
+
+    // 2) helper to add a device‐row (with MAC & Asset Tag)
+    function addRow(dev='',ip='',mac='',tag=''){
+      $('#devList').append(`
+        <div class="row mb-2 dev-row">
+          <div class="col-2">
+            <input class="form-control dev" placeholder="Device" value="${dev}">
+          </div>
+          <div class="col-3">
+            <input class="form-control ip"  placeholder="IP"     value="${ip}">
+          </div>
+          <div class="col-3">
+            <input class="form-control mac" placeholder="MAC (optional)"   value="${mac}">
+          </div>
+          <div class="col-2">
+            <input class="form-control tag" placeholder="Asset Tag (optional)" value="${tag}">
+          </div>
+          <div class="col-2 text-end">
+            <button class="btn btn-sm btn-danger remove">&times;</button>
+          </div>
+        </div>`);
+    }
+    $('#addDevRow').click(() => addRow());
+    $(document).on('click','.remove', e =>
+      $(e.currentTarget).closest('.dev-row').remove()
+    );
+
+    // 3) Open “Add New” modal
+    $('#addNew').click(()=>{
+      $('#editEntryId').val('');
+      $('#sname,#snaos,#sdept').val('');
+      $('#devList').empty();
+      addRow();
+      $('#saveAll').off().click(saveEntry);
+      new bootstrap.Modal($('#staticModal')).show();
+    });
+
+    // 4) Save handler (POST or PUT)
+    function saveEntry(){
+      const eid    = $('#editEntryId').val(),
+            url    = eid? `/api/static_entries/${eid}` : '/api/static_entries',
+            method = eid? 'PUT' : 'POST';
+
+      const payload = {
+        name:       $('#sname').val().trim(),
+        naos_id:    $('#snaos').val().trim(),
+        department: $('#sdept').val().trim(),
+        devices:    $('.dev-row').map((_,r)=>({
+                       device:      $(r).find('.dev').val().trim(),
+                       ip:          $(r).find('.ip').val().trim(),
+                       mac_address: $(r).find('.mac').val().trim(),
+                       asset_tag:   $(r).find('.tag').val().trim()
+                     })).get()
+                     .filter(x=>x.device && x.ip)
+      };
+
+      if (!payload.name || !payload.department || !payload.devices.length) {
+        return alert('Fill Name, Naos ID, Dept, and at least one Device/IP');
+      }
+
+      fetch(url,{
+        method, headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(async r=>{
+        const d = await r.json();
+        if (!r.ok) return alert(d.error||'Save failed');
+        bootstrap.Modal.getInstance($('#staticModal')).hide();
+        table.ajax.reload();
+      })
+      .catch(()=>alert('Network error'));
+    }
+
+    // 5) Edit existing entry
+    window.openEdit = eid => {
+      $('#editEntryId').val(eid);
+      $('#devList').empty();
+      $.getJSON(`/api/static_entries/${eid}`, entry=>{
+        $('#sname').val(entry.name);
+        $('#snaos').val(entry.naos_id);
+        $('#sdept').val(entry.department);
+        entry.devices.forEach(d=>
+          addRow(d.device, d.ip, d.mac_address, d.asset_tag)
+        );
+        $('#saveAll').off().click(saveEntry);
+        new bootstrap.Modal($('#staticModal')).show();
+      }).fail(()=>alert('Failed to load entry'));
+    };
+
+    // 6) Delete single device/IP
+    window.deleteDevice = (eid,dev,ip) => {
+      if (!confirm(`Delete ${dev} / ${ip}?`)) return;
+      fetch('/api/static_devices',{
+        method:'DELETE',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ entry_id:eid, device:dev, ip })
+      }).then(_=> table.ajax.reload());
+    };
+  });
+  </script>
+{% endblock %}

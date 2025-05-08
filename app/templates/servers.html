@@ -1,0 +1,198 @@
+{# templates/servers.html #}
+{% extends "base.html" %}
+
+{% block title %}Servers{% endblock %}
+
+{% block head %}
+  {{ super() }}
+  <!-- DataTables CSS -->
+  <link 
+    href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" 
+    rel="stylesheet">
+  <link 
+    href="https://cdn.datatables.net/rowgroup/1.3.0/css/rowGroup.bootstrap5.min.css" 
+    rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+  <!-- Main Content -->
+  <div class="main">
+    <h2><i class="bi bi-server me-1"></i>Servers</h2>
+    <button id="addSrv" class="btn btn-primary mb-3">
+      <i class="bi bi-plus-lg"></i> Add New Server
+    </button>
+
+    <div class="card">
+      <div class="card-body p-0">
+        <table id="srvTable" class="table mb-0 w-100">
+          <thead class="table-light">
+            <tr>
+              <!-- hidden grouping column -->
+              <th style="display:none">Server Name</th>
+              <th>IP</th>
+              <th>MAC</th>
+              <th>Type</th>
+              <th>Added On</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal fade" id="srvModal" tabindex="-1">
+      <div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Add / Edit Server</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="srvId">
+          <div class="row mb-3">
+            <div class="col">
+              <label>Server Name</label>
+              <input id="serverName" class="form-control">
+            </div>
+            <div class="col">
+              <label>MAC (optional)</label>
+              <input id="serverMac" class="form-control">
+            </div>
+            <div class="col">
+              <label>Type (optional)</label>
+              <input id="serverType" class="form-control">
+            </div>
+          </div>
+          <div id="ipList"></div>
+          <button id="addIpRow" class="btn btn-outline-secondary btn-sm mb-3">
+            + Add IP
+          </button>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button id="saveSrvAll" class="btn btn-primary">Save Server</button>
+        </div>
+      </div></div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+
+  {% raw %}
+  <!-- jQuery & DataTables JS -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+  <script src="https://cdn.datatables.net/rowgroup/1.3.0/js/dataTables.rowGroup.min.js"></script>
+
+  <script>
+  $(function(){
+    function addIpRow(ip='') {
+      $('#ipList').append(`
+        <div class="row mb-2 ip-row">
+          <div class="col-10">
+            <input class="form-control ip" placeholder="IP" value="${ip}">
+          </div>
+          <div class="col-2 text-end">
+            <button class="btn btn-sm btn-danger remove">&times;</button>
+          </div>
+        </div>`);
+    }
+
+    $(document).on('click', '.remove', e =>
+      $(e.currentTarget).closest('.ip-row').remove()
+    );
+
+    const table = $('#srvTable').DataTable({
+      ajax: { url:'/api/servers_flat', dataSrc:'' },
+      columns: [
+        { data:'server_name', visible:false },
+        { data:'ip'            },
+        { data:'mac_address'   },
+        { data:'type'          },
+        { data:'added_at'      },
+        { data:null, orderable:false, render: r => `
+          <button class="btn btn-sm btn-warning me-1" onclick="openSrvEdit(${r.server_id})">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <button class="btn btn-sm btn-danger" onclick="deleteServerIp(${r.ip_id})">
+            <i class="bi bi-trash"></i>
+          </button>` }
+      ],
+      order: [[0,'asc']],
+      rowGroup: {
+        dataSrc: 'server_name',
+        startRender: (rows, name) => `
+          <tr class="table-secondary">
+            <td colspan="5" class="fw-bold">${name}</td>
+          </tr>`,
+        endRender: null
+      }
+    });
+
+    $('#addIpRow').click(() => addIpRow());
+
+    $('#addSrv').click(() => {
+      $('#srvId').val('');
+      $('#serverName,#serverMac,#serverType').val('');
+      $('#ipList').empty();
+      addIpRow();
+      $('#saveSrvAll').off().click(saveServer);
+      new bootstrap.Modal('#srvModal').show();
+    });
+
+    function saveServer(){
+      const sid    = $('#srvId').val();
+      const url    = sid ? `/api/servers/${sid}` : '/api/servers';
+      const method = sid ? 'PUT' : 'POST';
+      const payload = {
+        server_name: $('#serverName').val().trim(),
+        mac_address: $('#serverMac').val().trim(),
+        type:        $('#serverType').val().trim(),
+        ips:         $('.ip').map((_,el)=>$(el).val().trim()).get().filter(x=>x)
+      };
+      fetch(url, {
+        method,
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(async resp => {
+        const data = await resp.json();
+        if (!resp.ok) {
+          return alert(data.error || 'Unknown error');
+        }
+        $('#srvModal').modal('hide');
+        table.ajax.reload();
+      })
+      .catch(err=>{
+        console.error(err);
+        alert('Save failed—see console');
+      });
+    }
+
+    window.openSrvEdit = function(sid){
+      $.getJSON('/api/servers', data => {
+        const s = data.find(x=>x.id===sid);
+        $('#srvId').val(sid);
+        $('#serverName').val(s.server_name);
+        $('#serverMac').val(s.mac_address);
+        $('#serverType').val(s.type);
+        $('#ipList').empty();
+        s.ips.forEach(r => addIpRow(r.ip));
+        $('#saveSrvAll').off().click(saveServer);
+        new bootstrap.Modal('#srvModal').show();
+      });
+    };
+
+    window.deleteServerIp = function(ipId){
+      if(!confirm('Delete this IP?')) return;
+      fetch(`/api/server_ips/${ipId}`, { method:'DELETE' })
+        .then(_=> table.ajax.reload());
+    };
+  });
+  </script>
+  {% endraw %}
+{% endblock %}

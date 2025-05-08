@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}IP Map{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-grid-3x3-gap me-2"></i>IP Map</h2>
+  <div class="d-flex align-items-center">
+    <label for="rangeSel" class="me-2 mb-0">Range:</label>
+    <select id="rangeSel" class="form-select me-3" style="width:200px">
+      {% for cidr in nets %}
+        <option value="{{ cidr }}">{{ cidr }}</option>
+      {% endfor %}
+    </select>
+    <button id="refreshBtn" class="btn btn-outline-primary">
+      <i class="bi bi-arrow-clockwise"></i> Refresh
+    </button>
+  </div>
+</div>
+
+<div id="grid" class="d-grid border"
+     style="grid-template-columns: repeat(16, 60px); gap:4px; overflow:auto;">
+  <!-- cells injected here -->
+</div>
+
+<style>
+  #grid .seat {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    border-radius: 4px;
+  }
+</style>
+
+<script>
+  const grid       = document.getElementById('grid');
+  const rangeSel   = document.getElementById('rangeSel');
+  const refreshBtn = document.getElementById('refreshBtn');
+
+  function buildGrid(data) {
+  // 1) dispose old tooltips
+  document.querySelectorAll('.tooltip').forEach(t => {
+    bootstrap.Tooltip.getInstance(t)?.dispose();
+  });
+
+  // 2) clear grid
+  grid.innerHTML = '';
+
+  // 3) populate
+  data.forEach(o => {
+    const cell = document.createElement('div');
+    cell.classList.add('seat');
+    cell.textContent = o.short;
+    cell.setAttribute('title', o.taken ? `${o.kind}: ${o.name}` : 'Free');
+
+    // 4) colour logic
+    if (['Static','Device','Server'].includes(o.kind)) {
+      // registered entries → RED
+      cell.classList.add('bg-danger','text-white');
+    } else if (o.taken) {
+      // any scanned lease (including DHCP) → BLUE
+      cell.classList.add('bg-primary','text-white');
+    } else {
+      // free → GREEN
+      cell.classList.add('bg-success','text-white');
+    }
+
+    grid.appendChild(cell);
+  });
+
+  // 5) init new tooltips
+  Array.from(grid.querySelectorAll('.seat')).forEach(el =>
+    new bootstrap.Tooltip(el, { boundary:'viewport' })
+  );
+}
+
+
+  function loadMap() {
+    const r = encodeURIComponent(rangeSel.value);
+    fetch(`/api/ip_map?range=${r}`)
+      .then(resp => resp.json())
+      .then(buildGrid)
+      .catch(e => {
+        console.error('IP map load failed', e);
+        grid.innerHTML = '<div class="text-danger p-3">Failed to load IP map</div>';
+      });
+  }
+
+  rangeSel.addEventListener('change', loadMap);
+  refreshBtn.addEventListener('click', loadMap);
+
+  // initial load + auto-refresh every 30s
+  loadMap();
+  setInterval(loadMap, 30000);
+</script>
+
+{% endblock %}

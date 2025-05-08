@@ -1,0 +1,121 @@
+<!-- app/templates/login.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login – Naos IP MAP</title>
+  <link rel="icon" href="/css/naos.ico" />
+
+  <!-- Bootstrap CSS -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+    body {
+      /* full-page background, shifted up slightly */
+      background: url('/css/naos.png') no-repeat center top;
+      background-size: cover;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: system-ui, sans-serif;
+    }
+    .login-logo {
+      width: 220px;
+      margin-bottom: 1rem;
+    }
+    .app-title {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #d32f2f; /* match your red accent */
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+      margin-bottom: 1.5rem;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 400px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Naos logo -->
+  <img src="/css/naos.png" alt="Naos Solutions" class="login-logo" />
+
+  <!-- IP MAP title -->
+  <div class="app-title">IP MAP</div>
+
+  <!-- Login card -->
+  <div class="card shadow login-card">
+    <div class="card-body p-4">
+      <h3 class="card-title text-center mb-4">Please sign in</h3>
+      <form id="loginForm">
+        <div class="mb-3">
+          <label for="username" class="form-label">Username</label>
+          <input
+            type="text"
+            class="form-control"
+            id="username"
+            name="username"
+            placeholder="admin"
+            required
+          />
+        </div>
+        <div class="mb-3">
+          <label for="password" class="form-label">Password</label>
+          <input
+            type="password"
+            class="form-control"
+            id="password"
+            name="password"
+            placeholder="••••••••"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          class="btn btn-danger w-100"
+        >
+          Log In
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    document
+      .getElementById('loginForm')
+      .addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.currentTarget;
+        const data = new URLSearchParams(new FormData(form));
+        try {
+          const resp = await fetch('/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: data.toString(),
+          });
+          if (!resp.ok) {
+            const err = await resp.json();
+            return alert(err.detail || 'Login failed');
+          }
+          const { access_token } = await resp.json();
+          localStorage.setItem('token', access_token);
+          window.location.href = '/map';
+        } catch (err) {
+          console.error(err);
+          alert('Network error during login');
+        }
+      });
+  </script>
+</body>
+</html>
