@@ -1,4 +1,3 @@
-{# templates/history.html #}
 {% extends "base.html" %}
 
 {% block title %}History{% endblock %}
@@ -13,7 +12,7 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h2><i class="bi bi-clock-history me-2"></i>Scan History</h2>
+  <h2><i class="bi bi-clock-history me-2"></i> Scan History</h2>
 
   <div class="d-flex align-items-center">
     <label class="me-2 mb-0">Range:</label>
@@ -65,26 +64,39 @@
 
 {% block scripts %}
   {{ super() }}
-  <!-- jQuery + DataTables JS -->
+  <!-- jQuery & DataTables JS -->
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
   <script>
-  $(function(){
-    // initialize
+   $(function(){
     const hist = $('#histTable').DataTable({
-      ajax: { url: '/api/history', dataSrc: '' },
       pageLength: 100,
+      ajax: {
+        url: '/api/history/',    // point at your mounted router
+        dataSrc: '',
+        data: function() {
+          const days  = $('#hist-days').val();
+          const range = $('#rangeSelect').val();
+          const ip    = $('#hist-ip').val().trim();
+          // return an object — DataTables will serialize it into ?days=…&range=…[&ip=…]
+          return {
+            days:  days,
+            range: range,
+            ip:    ip || undefined
+          };
+        }
+      },
       columns: [
         { data: 'ip' },
         { data: 'hostname' },
-        { data: 'mac' },
+        { data: 'mac_address' },
         { data: 'vendor' },
         { data: 'status' },
         { data: 'scan_time' }
       ],
-      order: [[0,'desc']],
+      order: [[5,'desc']],
       rowCallback: (row, data) => {
         $(row)
           .toggleClass('table-success', data.status==='Up')
@@ -93,18 +105,10 @@
     });
 
     function loadHist(){
-      const ip    = $('#hist-ip').val(),
-            days  = $('#hist-days').val(),
-            range = $('#rangeSelect').val();
-      // build URL using `range` param (not `nets`)
-      let url = `/api/history?days=${days}&range=${encodeURIComponent(range)}`;
-      if(ip) url += `&ip=${ip}`;
-      hist.ajax.url(url).load();
+      hist.ajax.reload();
     }
 
-    // wire buttons
     $('#btnHist, #refreshBtn').click(loadHist);
-    // load on page‑load
     loadHist();
   });
   </script>

@@ -1,25 +1,17 @@
-{# templates/live.html #}
+{# app/templates/live.html #}
 {% extends "base.html" %}
 
 {% block title %}Live Monitor{% endblock %}
-
 {% block head %}
   {{ super() }}
-  <!-- DataTables CSS -->
-  <link
-    href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css"
-    rel="stylesheet">
-  <style>
-    #loading { display: none; }
-  </style>
+  <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <style>#loading{display:none}</style>
 {% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h2><i class="bi bi-speedometer2 me-2"></i> Live Monitor</h2>
 </div>
-
-<!-- Controls Card -->
 <div class="card mb-4">
   <div class="card-header">Controls</div>
   <div class="card-body d-flex align-items-center">
@@ -29,12 +21,9 @@
       </button>
       <ul class="dropdown-menu p-2" style="max-height:250px;overflow:auto">
         {% for net in nets %}
-          <li class="mb-1">
-            <label class="dropdown-item">
-              <input type="checkbox" class="form-check-input me-2" value="{{ net }}">
-              {{ net }}
-            </label>
-          </li>
+        <li><label class="dropdown-item">
+          <input type="checkbox" class="form-check-input me-2" value="{{net}}">{{net}}
+        </label></li>
         {% endfor %}
       </ul>
     </div>
@@ -43,21 +32,12 @@
     <span id="loading" class="text-info fw-semibold">⏳ Scanning…</span>
   </div>
 </div>
-
-<!-- Devices Table -->
 <div class="card">
   <div class="card-header">Devices Status</div>
   <div class="card-body">
-    <table id="devTable" class="table table-striped table-hover w-100">
+    <table id="devTable" class="table table-striped w-100">
       <thead class="table-light text-center">
-        <tr>
-          <th>IP</th>
-          <th>Hostname</th>
-          <th>MAC</th>
-          <th>Vendor</th>
-          <th>Status</th>
-          <th>Last Checked</th>
-        </tr>
+        <tr><th>IP</th><th>Hostname</th><th>MAC</th><th>Vendor</th><th>Status</th><th>Last Checked</th></tr>
       </thead>
       <tbody></tbody>
     </table>
@@ -67,81 +47,80 @@
 
 {% block scripts %}
   {{ super() }}
-  <!-- jQuery & DataTables JS -->
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-
   <script>
   $(function(){
     let ajaxParam = "";
 
-    // 1) Initialize DataTable
+    // Initialize DataTable once
     const table = $('#devTable').DataTable({
       pageLength: 100,
       ajax: {
-        url: '/api/devices_filter',
-        dataSrc: ''
+        url: '/api/live',
+        dataSrc: '',
+        cache: false,           // disable caching
+        data: function(d) {     // attach nets[] params if set
+          if (ajaxParam) {
+            d.nets = ajaxParam.split(',');
+          }
+        }
       },
       columns: [
         { data: 'ip' },
         { data: 'hostname' },
-        { data: 'mac' },
+        { data: 'mac_address' },
         { data: 'vendor' },
         { data: 'status' },
-        { data: 'last_checked' }
+        {
+          data: 'last_checked',
+          render: d => new Date(d).toLocaleString()   // friendly timestamp
+        }
       ],
       rowCallback: (row, data) => {
         $(row)
           .toggleClass('table-success', data.status === 'Up')
           .toggleClass('table-danger',  data.status === 'Down');
       },
-      order: [[0,'asc']]
+      order: [[0, 'asc']]
     });
 
-    // 2) reload table with optional nets query
-    function loadTable(){
-      table.ajax.url('/api/devices_filter?nets=' + ajaxParam).load();
-    }
-
-    // 3) helper to read checked ranges
-    function chosenRanges(){
-      return $('.dropdown-menu input:checked')
-             .map((_,el)=>el.value)
-             .get();
-    }
-
-    // 4) scan + refresh table
+    // Kick off a scan then reload the table
     function startScan(nets){
-      $('#loading').show();
-      fetch('/scan',{
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
+      const msg = nets.length
+        ? `Scanning ranges: ${nets.join(', ')}…`
+        : 'Scanning all ranges…';
+      $('#loading').text(msg).show();
+      fetch('/api/live/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nets })
       })
-      .then(()=>{
+      .then(res => {
+        if (!res.ok) throw new Error(`Scan failed ${res.status}`);
+      })
+      .then(() => {
+        // remember which nets we scanned
         ajaxParam = nets.join(',');
-        loadTable();
+        // reload the DataTable with fresh data
+        table.ajax.reload();
       })
-      .catch(e=>{
-        alert('Scan error: ' + e);
-      })
-      .finally(()=>{
-        $('#loading').hide();
+      .catch(err => alert('Scan error: ' + err))
+      .finally(() => {
+        $('#loading').text('⏳ Scanning…').hide();
       });
     }
 
-    // 5) on‑load just populate with existing data (no auto‑scan)
-    loadTable();
-
-    // 6) wire up buttons
-    $('#scanAll').click(()=> startScan([]));
-    $('#scanCustom').click(()=>{
-      const nets = chosenRanges();
-      if(!nets.length){
-        return alert("Please select at least one range");
+    $('#scanAll').click(() => startScan([]));
+    $('#scanCustom').click(() => {
+      const chosen = $('.dropdown-menu input:checked')
+                        .map((_,el)=> el.value)
+                        .get();
+      if (!chosen.length) {
+        return alert('Select at least one range');
       }
-      startScan(nets);
+      startScan(chosen);
     });
   });
   </script>

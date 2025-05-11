@@ -1,0 +1,217 @@
+{# app/templates/admin_dashboard.html #}
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <!-- Header with icon -->
+  <div class="d-flex align-items-center mb-4">
+    <i class="bi bi-shield-lock-fill fs-2 text-primary me-3"></i>
+    <h1 class="mb-0 display-6">Admin Dashboard</h1>
+  </div>
+
+  <!-- IP Ranges Panel -->
+  <div class="card mb-5 shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <h2 class="h5 mb-0">IP Ranges</h2>
+    </div>
+    <div class="card-body">
+      <ul id="range-list" class="list-group mb-3">
+        {% for r in ranges %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <span>{{ r.name }} <small class="text-muted">({{ r.cidr }})</small></span>
+            <button type="button"
+                    class="btn btn-sm btn-outline-danger delete-range"
+                    data-id="{{ r.id }}">
+              Delete
+            </button>
+          </li>
+        {% else %}
+          <li class="list-group-item"><em>No IP ranges yet.</em></li>
+        {% endfor %}
+      </ul>
+
+      <form id="add-range-form" class="row g-2">
+        <div class="col-md-5">
+          <input name="name"
+                 class="form-control form-control-sm"
+                 placeholder="Range name"
+                 required>
+        </div>
+        <div class="col-md-5">
+          <input name="cidr"
+                 class="form-control form-control-sm"
+                 placeholder="CIDR (e.g. 192.168.1.0/24)"
+                 required>
+        </div>
+        <div class="col-md-2 d-grid">
+          <button type="submit" class="btn btn-sm btn-primary">Add Range</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin Users Panel -->
+  <div class="card mb-5 shadow-sm">
+    <div class="card-header bg-secondary text-white">
+      <h2 class="h5 mb-0">Admin Users</h2>
+    </div>
+    <div class="card-body">
+      <ul id="admin-list" class="list-group mb-3">
+        {% for a in admins %}
+          <li class="list-group-item d-flex flex-wrap align-items-center">
+            <strong class="me-auto">{{ a.username }}</strong>
+
+            <button type="button"
+                    class="btn btn-sm btn-outline-danger me-2 mb-2 delete-admin"
+                    data-id="{{ a.id }}">
+              Delete
+            </button>
+
+            <div class="input-group input-group-sm me-2 mb-2" style="width: 200px;">
+              <input type="password"
+                     class="form-control pw-input"
+                     placeholder="New password"
+                     data-id="{{ a.id }}">
+              <button class="btn btn-outline-dark change-pw"
+                      type="button"
+                      data-id="{{ a.id }}">
+                Change
+              </button>
+            </div>
+          </li>
+        {% else %}
+          <li class="list-group-item"><em>No admin users yet.</em></li>
+        {% endfor %}
+      </ul>
+
+      <form id="add-admin-form" class="row g-2">
+        <div class="col-md-5">
+          <input name="username"
+                 class="form-control form-control-sm"
+                 placeholder="Username"
+                 required>
+        </div>
+        <div class="col-md-5">
+          <input name="password"
+                 type="password"
+                 class="form-control form-control-sm"
+                 placeholder="Password"
+                 required>
+        </div>
+        <div class="col-md-2 d-grid">
+          <button type="submit" class="btn btn-sm btn-primary">Create Admin</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const reload = () => window.location.reload();
+
+  // 1) Add Range
+  document
+    .getElementById('add-range-form')
+    .addEventListener('submit', async e => {
+      e.preventDefault();                         // stop native GET
+      const form = e.target;
+      const name = form.name.value.trim();
+      const cidr = form.cidr.value.trim();
+      if (!name || !cidr) return;
+
+      try {
+        const res = await fetch('/api/ranges', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, cidr })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        reload();
+      } catch (err) {
+        alert('Error adding range: ' + err);
+      }
+    });
+
+  // 2) Delete Range
+  document.querySelectorAll('.delete-range').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      if (!confirm('Delete this range?')) return;
+      try {
+        const res = await fetch(`/api/ranges/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(await res.text());
+        reload();
+      } catch (err) {
+        alert('Error deleting range: ' + err);
+      }
+    });
+  });
+
+  // 3) Create Admin
+  document
+    .getElementById('add-admin-form')
+    .addEventListener('submit', async e => {
+      e.preventDefault();
+      const form = e.target;
+      const username = form.username.value.trim();
+      const password = form.password.value.trim();
+      if (!username || !password) return;
+
+      try {
+        const res = await fetch('/api/admins', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        reload();
+      } catch (err) {
+        alert('Error creating admin: ' + err);
+      }
+    });
+
+  // 4) Delete Admin
+  document.querySelectorAll('.delete-admin').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      if (!confirm('Delete this admin?')) return;
+      try {
+        const res = await fetch(`/api/admins/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(await res.text());
+        reload();
+      } catch (err) {
+        alert('Error deleting admin: ' + err);
+      }
+    });
+  });
+
+  // 5) Change Password
+  document.querySelectorAll('.change-pw').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const input = document.querySelector(`.pw-input[data-id="${id}"]`);
+      const newPassword = input.value.trim();
+      if (!newPassword) return alert('Enter a new password');
+
+      try {
+        const res = await fetch(`/api/admins/${id}/password`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: newPassword })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        alert('Password changed');
+        input.value = '';
+      } catch (err) {
+        alert('Error changing password: ' + err);
+      }
+    });
+  });
+</script>
+{% endblock %}
+

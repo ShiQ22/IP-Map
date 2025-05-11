@@ -1,42 +1,40 @@
-{# templates/static.html #}
 {% extends "base.html" %}
-
-{% block title %}Static IPs{% endblock %}
+{% block title %}User IP Management{% endblock %}
 
 {% block head %}
   {{ super() }}
-  <!-- DataTables CSS -->
   <link
     href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css"
-    rel="stylesheet">
+    rel="stylesheet"
+  >
   <link
     href="https://cdn.datatables.net/rowgroup/1.3.0/css/rowGroup.bootstrap5.min.css"
-    rel="stylesheet">
+    rel="stylesheet"
+  >
 {% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h2><i class="bi bi-hdd-network me-2"></i>Users IP Management</h2>
-  <button id="addNew" class="btn btn-primary">
-    <i class="bi bi-plus-lg"></i> Add new User IP
-  </button>
+  <h2><i class="bi bi-person-badge me-2"></i>User IP Management</h2>
+  <div>
+    <button id="importBtn" class="btn btn-secondary me-2">
+      <i class="bi bi-upload"></i> Import…
+    </button>
+    <button id="addUserIpBtn" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Add User IP
+    </button>
+  </div>
 </div>
 
-<div class="card">
+<div class="card mb-4">
   <div class="card-header">Entries</div>
   <div class="card-body p-0">
-    <table id="statTable" class="table table-striped mb-0 w-100">
+    <table id="userIpTable" class="table table-striped mb-0 w-100">
       <thead class="table-light">
         <tr>
-          <th>Name</th>
-          <th>Naos ID</th>
-          <th>Dept</th>
-          <th>Device</th>
-          <th>IP</th>
-          <th>MAC</th>
-          <th>Asset Tag</th>
-          <th>Added</th>
-          <th>Actions</th>
+          <th>Name</th><th>Naos ID</th><th>Dept</th><th>Device</th>
+          <th>IP</th><th>MAC</th><th>Asset Tag</th><th>Added</th>
+          <th>Updated By</th><th>Actions</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -44,182 +42,431 @@
   </div>
 </div>
 
-<!-- Add/Edit Modal -->
-<div class="modal fade" id="staticModal" tabindex="-1">
+<!-- Main Modal -->
+<div class="modal fade" id="userIpModal" tabindex="-1">
   <div class="modal-dialog modal-lg"><div class="modal-content">
     <div class="modal-header">
-      <h5 class="modal-title">Add / Edit Static IP Entry</h5>
+      <h5 class="modal-title">Add / Edit User IP</h5>
       <button class="btn-close" data-bs-dismiss="modal"></button>
     </div>
     <div class="modal-body">
-      <input type="hidden" id="editEntryId">
+      <input type="hidden" id="modalUserId">
+      <input type="hidden" id="modalIpId">
+
       <div class="row mb-3">
-        <div class="col"><label>Name</label><input id="sname" class="form-control"></div>
-        <div class="col"><label>Naos ID</label><input id="snaos" class="form-control"></div>
-        <div class="col"><label>Department</label><input id="sdept" class="form-control"></div>
+        <div class="col">
+          <label>Name</label>
+          <div class="input-group">
+            <input list="userNames" id="uiUsername" class="form-control" placeholder="Type name">
+            <button id="uiAddUserBtn" class="btn btn-outline-secondary">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </div>
+          <datalist id="userNames"></datalist>
+        </div>
+        <div class="col">
+          <label>Naos ID</label>
+          <div class="input-group">
+            <input list="userIds" id="uiNaosId" class="form-control" placeholder="Type ID">
+            <button id="uiAddUserBtn2" class="btn btn-outline-secondary">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </div>
+          <datalist id="userIds"></datalist>
+        </div>
+        <div class="col">
+          <label>Department</label>
+          <input id="uiDept" class="form-control" placeholder="Department">
+        </div>
       </div>
-      <div id="devList"></div>
-      <button id="addDevRow" class="btn btn-outline-secondary btn-sm mb-3">
-        + Add Device / IP
+
+      <div id="uiRows"></div>
+      <button id="uiAddRow" class="btn btn-outline-secondary btn-sm mb-3">
+        + Add Device / IP
       </button>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-      <button id="saveAll" class="btn btn-primary">Save Entry</button>
+      <button id="uiSave" class="btn btn-primary">Save Entry</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- New User Sub-Modal -->
+<div class="modal fade" id="newUserModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header">
+      <h5 class="modal-title">Add New User</h5>
+      <button class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body">
+      <label>Name</label>
+      <input id="newName" class="form-control mb-3">
+      <label>Naos ID</label>
+      <input id="newNaos" class="form-control mb-3">
+      <label>Department</label>
+      <input id="newDept" class="form-control">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button id="saveNewUser" class="btn btn-primary">Create</button>
     </div>
   </div></div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-  {{ super() }}
-  <!-- jQuery + DataTables JS -->
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-  <script src="https://cdn.datatables.net/rowgroup/1.3.0/js/dataTables.rowGroup.min.js"></script>
+{{ super() }}
 
-  <script>
-  $(function(){
-    // 1) Initialize DataTable (added MAC & Asset Tag columns)
-    const table = $('#statTable').DataTable({
-      ajax: { url:'/api/static_flat', dataSrc: '' },
-      columns: [
-        { data: 'name' },
-        { data: 'naos_id' },
-        { data: 'department' },
-        { data: 'device' },
-        { data: 'ip' },
-        { data: 'mac_address' },
-        { data: 'asset_tag' },
-        { data: 'added_at' },
-        {
-          data: null, orderable: false,
-          render: r => `
-            <button class="btn btn-sm btn-warning me-1"
-                    onclick="openEdit(${r.entry_id})">
-              <i class="bi bi-pencil"></i>
-            </button>
-            <button class="btn btn-sm btn-danger"
-                    onclick="deleteDevice(${r.entry_id},'${r.device}','${r.ip}')">
-              <i class="bi bi-trash"></i>
-            </button>`
-        }
-      ],
-      order: [[0,'asc']],
-      rowGroup: {
-        dataSrc: row => `${row.name}||${row.department}`,
-        startRender: (rows, group) => {
-          const [n,d] = group.split('||');
-          return $('<tr/>').append(
-            `<td colspan="9" class="fw-bold">${n} — ${d}</td>`
-          );
-        },
-        endRender: null
-      },
-      dom: '<"d-flex justify-content-between mb-2"f p>rt<"d-flex justify-content-end mt-2"p>',
-      language: {
-        paginate: { previous: '&lsaquo;', next: '&rsaquo;' }
+<!-- ─── JS deps ─────────────────────────────────────────────── -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/rowgroup/1.3.0/js/dataTables.rowGroup.min.js"></script>
+
+<!-- ─── Import-wizard modal (unchanged) ─────────────────────── -->
+<div class="modal fade" id="importModal" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header">
+      <h5 class="modal-title">Import Users — CSV</h5>
+      <button class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body">
+      <p class="mb-1">Required columns: <code>username</code>, <code>naos_id</code>, <code>department</code></p>
+      <p class="fw-light small mb-3">Example: <code>Ahmed Salah, 423211, IT</code></p>
+
+      <input id="csvInput" type="file" accept=".csv" class="form-control mb-3">
+      <div id="dupAlert" class="alert alert-danger d-none small"></div>
+
+      <div id="previewWrap" class="table-responsive d-none">
+        <table class="table table-sm table-striped mb-0">
+          <thead class="table-light"><tr><th>#</th><th>username</th><th>naos_id</th><th>department</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button id="importBtnConfirm" class="btn btn-primary" disabled>Import</button>
+    </div>
+  </div></div>
+</div>
+
+<script>
+/* ──────────  Helpers  ────────── */
+let usersCache = [];
+async function loadUsers() {
+  const u = await $.getJSON('/api/users/');
+  $('#userNames, #userIds').empty();
+  u.forEach(x => {
+    $('#userNames').append(`<option value="${x.username}">`);
+    $('#userIds').append(`<option value="${x.naos_id}">`);
+    x._dept = x.department;
+  });
+  usersCache = u;
+  return u;
+}
+function parseCsv(t) {
+  const [h, ...rows] = t.trim().split(/\r?\n/).map(r => r.split(/,\s*/));
+  const idx = { u: h.indexOf('username'), n: h.indexOf('naos_id'), d: h.indexOf('department') };
+  if (Object.values(idx).includes(-1)) throw 'Missing required column(s)';
+  return rows.map((r, i) => ({
+    _row: i + 2,
+    username: r[idx.u]?.trim(),
+    naos_id: r[idx.n]?.trim(),
+    department: r[idx.d]?.trim()
+  }));
+}
+async function enrichDuplicate(msg) {
+  const m = msg.match(/assigned to (\w+) #(\d+)/);
+  if (!m) return msg;
+  const [, type, id] = m;
+  if (type === 'user') {
+    const row = usersCache.find(x => x.id == id);
+    if (row) return `${msg} (${row.username})`;
+  }
+  return msg;
+}
+const lockDept = f => $('#uiDept').prop('readonly', f);
+
+/* ──────────  Main init  ────────── */
+$(async function init() {
+  await loadUsers();
+
+    const table = $('#userIpTable').DataTable({
+    ajax: {
+      url:      '/api/ips/users',   // list all user-owned IPs (never devices)
+      dataSrc:  '',
+      cache:    true
+    },
+    columns: [
+      { data: 'owner_username' },
+      { data: 'owner_naos_id' },
+      { data: 'department' },
+      { data: 'device_type' },
+      { data: 'ip_address' },
+      { data: 'mac_address', defaultContent: '' },
+      { data: 'asset_tag',    defaultContent: '' },
+      { data: 'created_at',   render: d => new Date(d).toLocaleString() },
+      { data: 'updated_by_username' },
+      {
+        data:     null,
+        orderable:false,
+        render:   r=>`
+          <button class="btn btn-sm btn-warning me-1" onclick="openUser(${r.owner_id})">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <button class="btn btn-sm btn-danger" onclick="deleteRow(${r.owner_id},${r.id})">
+            <i class="bi bi-trash"></i>
+          </button>`
       }
-    });
+    ],
+    rowGroup: {
+      dataSrc: 'owner_id',
+      startRender: rows => {
+        const r = rows.data()[0];
+        return $(`
+  <tr class="fw-bold bg-light">
+    <td colspan="10" style="white-space:nowrap">
+      ${r.owner_username}&nbsp;—&nbsp;${r.owner_naos_id}
+    </td>
+  </tr>`);
+      }
+    },
+    dom:'<"d-flex justify-content-between mb-2"f p>rt<"d-flex justify-content-end mt-2"p>'
+  });
 
-    // 2) helper to add a device‐row (with MAC & Asset Tag)
-    function addRow(dev='',ip='',mac='',tag=''){
-      $('#devList').append(`
-        <div class="row mb-2 dev-row">
-          <div class="col-2">
-            <input class="form-control dev" placeholder="Device" value="${dev}">
-          </div>
-          <div class="col-3">
-            <input class="form-control ip"  placeholder="IP"     value="${ip}">
-          </div>
-          <div class="col-3">
-            <input class="form-control mac" placeholder="MAC (optional)"   value="${mac}">
-          </div>
-          <div class="col-2">
-            <input class="form-control tag" placeholder="Asset Tag (optional)" value="${tag}">
-          </div>
-          <div class="col-2 text-end">
-            <button class="btn btn-sm btn-danger remove">&times;</button>
-          </div>
-        </div>`);
-    }
-    $('#addDevRow').click(() => addRow());
-    $(document).on('click','.remove', e =>
-      $(e.currentTarget).closest('.dev-row').remove()
+  /* field-sync */
+  async function sync(f, v) {
+  const u = usersCache.find(x => x[f] === v);
+  if (u) {
+    // Set the user context
+    $('#modalUserId').val(u.id);
+    $('#uiUsername').val(u.username);
+    $('#uiNaosId').val(u.naos_id);
+    $('#uiDept').val(u._dept);
+    lockDept(true);
+
+    // Load existing IPs for that user
+    const existing = await $.getJSON(`/api/users/${u.id}/ips`);
+    $('#uiRows').empty();
+    existing.forEach(p => 
+      addRow(p.device_type, p.ip_address, p.mac_address||'', p.asset_tag||'', p.id)
     );
 
-    // 3) Open “Add New” modal
-    $('#addNew').click(()=>{
-      $('#editEntryId').val('');
-      $('#sname,#snaos,#sdept').val('');
-      $('#devList').empty();
-      addRow();
-      $('#saveAll').off().click(saveEntry);
-      new bootstrap.Modal($('#staticModal')).show();
+    // Always leave one blank row for the new IP
+    addRow();
+  } else {
+    // New user: clear fields and start fresh
+    $('#modalUserId,#uiDept').val('');
+    $('#uiRows').empty();
+    addRow();
+    lockDept(false);
+  }
+}
+
+  $('#uiUsername').on('input', e => sync('username', e.target.value));
+  $('#uiNaosId').on('input', e => sync('naos_id', e.target.value));
+
+  /* quick-add user */
+  $('#uiAddUserBtn, #uiAddUserBtn2').on('click', () => {
+  $('#newName, #newNaos, #newDept').val('');
+  new bootstrap.Modal('#newUserModal').show();
+});
+
+// Handle “Create” in that modal
+$('#saveNewUser').on('click', async () => {
+  const username   = $('#newName').val().trim();
+  const naosId     = $('#newNaos').val().trim();
+  const department = $('#newDept').val().trim();
+
+  if (!username || !naosId || !department) {
+    return alert('All fields are required');
+  }
+
+  try {
+    const response = await fetch('/api/users/', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        username,
+        naos_id:    naosId,
+        department
+      })
     });
 
-    // 4) Save handler (POST or PUT)
-    function saveEntry(){
-      const eid    = $('#editEntryId').val(),
-            url    = eid? `/api/static_entries/${eid}` : '/api/static_entries',
-            method = eid? 'PUT' : 'POST';
-
-      const payload = {
-        name:       $('#sname').val().trim(),
-        naos_id:    $('#snaos').val().trim(),
-        department: $('#sdept').val().trim(),
-        devices:    $('.dev-row').map((_,r)=>({
-                       device:      $(r).find('.dev').val().trim(),
-                       ip:          $(r).find('.ip').val().trim(),
-                       mac_address: $(r).find('.mac').val().trim(),
-                       asset_tag:   $(r).find('.tag').val().trim()
-                     })).get()
-                     .filter(x=>x.device && x.ip)
-      };
-
-      if (!payload.name || !payload.department || !payload.devices.length) {
-        return alert('Fill Name, Naos ID, Dept, and at least one Device/IP');
-      }
-
-      fetch(url,{
-        method, headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify(payload)
-      })
-      .then(async r=>{
-        const d = await r.json();
-        if (!r.ok) return alert(d.error||'Save failed');
-        bootstrap.Modal.getInstance($('#staticModal')).hide();
-        table.ajax.reload();
-      })
-      .catch(()=>alert('Network error'));
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Server rejected creation');
     }
 
-    // 5) Edit existing entry
-    window.openEdit = eid => {
-      $('#editEntryId').val(eid);
-      $('#devList').empty();
-      $.getJSON(`/api/static_entries/${eid}`, entry=>{
-        $('#sname').val(entry.name);
-        $('#snaos').val(entry.naos_id);
-        $('#sdept').val(entry.department);
-        entry.devices.forEach(d=>
-          addRow(d.device, d.ip, d.mac_address, d.asset_tag)
-        );
-        $('#saveAll').off().click(saveEntry);
-        new bootstrap.Modal($('#staticModal')).show();
-      }).fail(()=>alert('Failed to load entry'));
-    };
+    // close modal, refresh the dropdowns, and pre‐select the new user
+    bootstrap.Modal.getInstance('#newUserModal').hide();
+    await loadUsers();                  // your helper that repopulates #userNames/#userIds
+    $('#uiUsername').val(username).trigger('input');
 
-    // 6) Delete single device/IP
-    window.deleteDevice = (eid,dev,ip) => {
-      if (!confirm(`Delete ${dev} / ${ip}?`)) return;
-      fetch('/api/static_devices',{
-        method:'DELETE',
-        headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify({ entry_id:eid, device:dev, ip })
-      }).then(_=> table.ajax.reload());
-    };
+  } catch (e) {
+    alert('Failed to create user: ' + e.message);
+  }
+});
+
+  /* row helper */
+  function addRow(dev = 'pc', ip = '', mac = '', tag = '', rid = '') {
+    $('#uiRows').append(`
+      <div class="row mb-2 ui-row align-items-end" data-id="${rid}">
+        <div class="col-2">
+          <select class="form-select ui-dev">${
+            ['pc','laptop','mobile','tablet','wifi','other']
+              .map(x => `<option${x===dev?' selected':''}>${x}</option>`).join('')
+          }</select>
+        </div>
+        <div class="col-4"><input class="form-control ui-ip" placeholder="IP" value="${ip}"></div>
+        <div class="col-3"><input class="form-control ui-mac" placeholder="MAC (opt)" value="${mac}"></div>
+        <div class="col-2"><input class="form-control ui-tag" placeholder="Asset Tag (opt)" value="${tag}"></div>
+        <div class="col-1 text-end"><button class="btn btn-sm btn-danger ui-remove">&times;</button></div>
+      </div>`);
+  }
+  $('#uiAddRow').click(() => addRow());
+  $(document).on('click', '.ui-remove', e => $(e.currentTarget).closest('.ui-row').remove());
+
+  /* blank modal */
+  $('#addUserIpBtn').click(() => {
+    $('#uiUsername,#uiNaosId,#uiDept').val('');
+    $('#modalUserId').val('');
+    $('#uiRows').empty();
+    addRow();
+    lockDept(false);
+    $('#uiSave').off().click(saveEntry);
+    new bootstrap.Modal('#userIpModal').show();
   });
-  </script>
+
+  /* open edit */
+  window.openUser = async uid => {
+    $('#modalUserId').val(uid);
+    const ips = await $.getJSON(`/api/users/${uid}/ips`);
+    $('#uiUsername').val(ips[0].owner_username);
+    $('#uiNaosId').val(ips[0].owner_naos_id);
+    $('#uiDept').val(ips[0].department);
+    lockDept(true);
+    $('#uiRows').empty();
+    ips.forEach(p => addRow(p.device_type, p.ip_address, p.mac_address||'', p.asset_tag||'', p.id));
+    $('#uiSave').off().click(saveEntry);
+    new bootstrap.Modal('#userIpModal').show();
+  };
+
+  /* save (create/update/delete rows) */
+async function saveEntry() {
+  try {
+    const uid  = $('#modalUserId').val(),
+          dept = $('#uiDept').val().trim();
+    if (!uid)  throw 'Select or create a user';
+    if (!dept) throw 'Department is required';
+
+    const newRows = [], updRows = [], keep = [];
+    $('.ui-row').each((_,el) => {
+      const row$ = $(el),
+            id   = row$.data('id'),
+            ip   = row$.find('.ui-ip').val().trim();
+      if (!ip) throw 'IP is required';
+      const mac = row$.find('.ui-mac').val().trim(),
+            tag = row$.find('.ui-tag').val().trim();
+      const obj = {
+        department:  dept,
+        device_type: row$.find('.ui-dev').val(),
+        ip_address:  ip,
+        mac_address: mac || null,
+        asset_tag:   tag || null
+      };
+      if (id) {
+        obj.id = id;
+        updRows.push(obj);
+        keep.push(id);
+      } else {
+        newRows.push(obj);
+      }
+    });
+
+    const orig = await $.getJSON(`/api/users/${uid}/ips`);
+    await Promise.all(
+      orig
+        .filter(o => !keep.includes(o.id))
+        .map(o => fetch(`/api/users/${uid}/ips/${o.id}`, { method: 'DELETE' }))
+    );
+    await Promise.all(
+      updRows.map(o => fetch(`/api/users/${uid}/ips/${o.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(o)
+      }))
+    );
+    if (newRows.length) {
+      const res = await fetch(`/api/users/${uid}/ips`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRows)
+      });
+      if (!res.ok) throw await enrichDuplicate((await res.json()).detail || 'Save failed');
+    }
+
+    bootstrap.Modal.getInstance('#userIpModal').hide();
+    // Refresh the existing user-only table data
+    table.ajax.reload(null, false);
+  } catch (e) {
+    alert('Error: ' + e);
+  }
+}
+
+  /* delete (grid) */
+  window.deleteRow = (uid, ipid) => {
+    if (!confirm('Delete this entry?')) return;
+    fetch(`/api/users/${uid}/ips/${ipid}`, { method: 'DELETE' })
+          .then(() => table.ajax.reload(null, false))
+      .catch(() => alert('Delete failed'));
+  };
+
+  /* CSV import wizard (unchanged URLs) */
+  $('#importBtn').click(() => $('#importModal').modal('show'));
+  $('#csvInput').on('change', async e => {
+    $('#dupAlert').addClass('d-none').empty();
+    $('#previewWrap').addClass('d-none');
+    $('#importBtnConfirm').prop('disabled', true).removeData('file');
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const rows   = parseCsv(await file.text()),
+            dupFile= rows.filter((r,i) => rows.findIndex(x => x.naos_id === r.naos_id) !== i),
+            ids    = new Set(usersCache.map(u => u.naos_id)),
+            dupDb  = rows.filter(r => ids.has(r.naos_id));
+      if (dupFile.length || dupDb.length) {
+        $('#dupAlert').removeClass('d-none').html(
+          '<strong>Duplicates detected:</strong><br>' +
+          (dupFile.length ? '• In file: ' + dupFile.map(x => x.naos_id).join(', ') + '<br>' : '') +
+          (dupDb.length   ? '• Already exist: ' + dupDb.map(x => x.naos_id).join(', ')   : '')
+        );
+        return;
+      }
+      const $tb = $('#previewWrap tbody').empty();
+      rows.slice(0,5).forEach((r,i) => 
+        $tb.append(`<tr><td>${i+1}</td><td>${r.username}</td><td>${r.naos_id}</td><td>${r.department}</td></tr>`)
+      );
+      $('#previewWrap').removeClass('d-none');
+      $('#importBtnConfirm').prop('disabled', false).data('file', file);
+    } catch (err) {
+      $('#dupAlert').removeClass('d-none').text('Error: ' + err);
+    }
+  });
+  $('#importBtnConfirm').click(async function() {
+    const file = $(this).data('file');
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/users/import/', { method: 'POST', body: fd });
+    if (!res.ok) return alert('Import failed');
+    $('#importModal').modal('hide');
+    await loadUsers();
+    table.ajax.url('/api/ips/').load();
+  });
+
+});  // end init
+</script>
+
 {% endblock %}

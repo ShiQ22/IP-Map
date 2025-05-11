@@ -1,21 +1,27 @@
-# app/schemas/users.py
-from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from pydantic import BaseModel
+
 
 class UserBase(BaseModel):
     username: str
-    naos_id:  str
+    naos_id: str
+    department: str
+
 
 class UserCreate(UserBase):
+    """
+    For POST /users and individual + button-driven creation.
+    Fields: username, naos_id, department.
+    """
     pass
 
-class UserUpdate(BaseModel):
-    username: Optional[str] = None
-    naos_id:  Optional[str] = None
 
 class UserRead(UserBase):
-    id:         int
+    """
+    For GET /users
+    Exposes: id, username, naos_id, department, created_at, updated_at.
+    """
+    id: int
     created_at: datetime
     updated_at: datetime
 
