@@ -1,12 +1,31 @@
+{# app/templates/ip_map.html #}
 {% extends "base.html" %}
 {% block title %}IP Map{% endblock %}
-{% block content %}
 
+{% block head %}
+  {{ super() }}
+  <style>
+    /* Simple grid styling */
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 0.5rem;
+    }
+    #grid .cell {
+      padding: 0.5rem;
+      text-align: center;
+      cursor: default;
+      user-select: none;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h2><i class="bi bi-grid-3x3-gap me-2"></i>IP Map</h2>
-  <div class="d-flex align-items-center">
-    <label for="rangeSel" class="me-2 mb-0">Range:</label>
-    <select id="rangeSel" class="form-select me-3" style="width:200px">
+  <div class="input-group" style="width: auto;">
+    <label class="input-group-text" for="rangeSel">Range:</label>
+    <select id="rangeSel" class="form-select">
       {% for cidr in nets %}
         <option value="{{ cidr }}">{{ cidr }}</option>
       {% endfor %}
@@ -17,86 +36,74 @@
   </div>
 </div>
 
-<div id="grid" class="d-grid border"
-     style="grid-template-columns: repeat(16, 60px); gap:4px; overflow:auto;">
-  <!-- cells injected here -->
+<div id="grid" class="mb-4">
+  {# Cells will be injected here by JS #}
 </div>
-
-<style>
-  #grid .seat {
-    width: 60px;
-    height: 60px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    user-select: none;
-    border-radius: 4px;
-  }
-</style>
 
 <script>
   const grid       = document.getElementById('grid');
   const rangeSel   = document.getElementById('rangeSel');
   const refreshBtn = document.getElementById('refreshBtn');
 
+  // Build the grid of IP “seats”
   function buildGrid(data) {
-  // 1) dispose old tooltips
-  document.querySelectorAll('.tooltip').forEach(t => {
-    bootstrap.Tooltip.getInstance(t)?.dispose();
-  });
+    grid.innerHTML = '';  // clear old cells
 
-  // 2) clear grid
-  grid.innerHTML = '';
+    data.forEach(o => {
+      const cell = document.createElement('div');
+      cell.classList.add('cell', 'border');
 
-  // 3) populate
-  data.forEach(o => {
-    const cell = document.createElement('div');
-    cell.classList.add('seat');
-    cell.textContent = o.short;
-    cell.setAttribute('title', o.taken ? `${o.kind}: ${o.name}` : 'Free');
+      // Display shortened IP (e.g. “6.16”)
+      cell.textContent = o.short;
 
-    // 4) colour logic
-    if (['Static','Device','Server'].includes(o.kind)) {
-      // registered entries → RED
-      cell.classList.add('bg-danger','text-white');
-    } else if (o.taken) {
-      // any scanned lease (including DHCP) → BLUE
-      cell.classList.add('bg-primary','text-white');
-    } else {
-      // free → GREEN
-      cell.classList.add('bg-success','text-white');
-    }
+      // Colour & tooltip logic
+      if (o.taken) {
+        // Assigned in the database → RED
+        cell.classList.add('bg-danger', 'text-white');
+        cell.setAttribute('title', `${o.kind}: ${o.name}`);
+      }
+      else if (o.kind === 'Network') {
+        // Seen “up” on network scan → BLUE
+        cell.classList.add('bg-primary', 'text-white');
+        cell.setAttribute('title', 'Active on network');
+      }
+      else {
+        // Free IP → GREEN
+        cell.classList.add('bg-success', 'text-white');
+        cell.setAttribute('title', 'Free IP');
+      }
 
-    grid.appendChild(cell);
-  });
-
-  // 5) init new tooltips
-  Array.from(grid.querySelectorAll('.seat')).forEach(el =>
-    new bootstrap.Tooltip(el, { boundary:'viewport' })
-  );
-}
-
-
-  function loadMap() {
-    const r = encodeURIComponent(rangeSel.value);
-    fetch(`/api/ip_map?range=${r}`)
-      .then(resp => resp.json())
-      .then(buildGrid)
-      .catch(e => {
-        console.error('IP map load failed', e);
-        grid.innerHTML = '<div class="text-danger p-3">Failed to load IP map</div>';
-      });
+      grid.appendChild(cell);
+    });
   }
 
+  // Fetch JSON from our new endpoint
+  async function loadMap() {
+    const cidr = rangeSel.value;
+    try {
+      const resp = await fetch(`/api/ip_map?range=${encodeURIComponent(cidr)}`, {
+        credentials: 'same-origin'
+      });
+      if (!resp.ok) throw new Error(`Status ${resp.status}`);
+      const data = await resp.json();
+      buildGrid(data);
+    } catch (e) {
+      console.error('IP map load failed', e);
+      grid.innerHTML = `
+        <div class="text-danger p-3">
+          Failed to load IP map
+        </div>`;
+    }
+  }
+
+  // Initial load
+  loadMap();
+
+  // Reload whenever the range changes or user clicks Refresh
   rangeSel.addEventListener('change', loadMap);
   refreshBtn.addEventListener('click', loadMap);
 
-  // initial load + auto-refresh every 30s
-  loadMap();
-  setInterval(loadMap, 30000);
+  // Auto-refresh every 30 seconds
+  setInterval(loadMap, 30_000);
 </script>
-
 {% endblock %}

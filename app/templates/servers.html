@@ -1,261 +1,469 @@
 {# templates/servers.html #}
 {% extends "base.html" %}
-
-{% block title %}Servers{% endblock %}
+{% block title %}Server IP Management{% endblock %}
 
 {% block head %}
   {{ super() }}
-  <!-- DataTables CSS -->
-  <link 
-    href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" 
+  <link
+    href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css"
     rel="stylesheet">
-  <link 
-    href="https://cdn.datatables.net/rowgroup/1.3.0/css/rowGroup.bootstrap5.min.css" 
+  <link
+    href="https://cdn.datatables.net/rowgroup/1.3.0/css/rowGroup.bootstrap5.min.css"
     rel="stylesheet">
 {% endblock %}
 
 {% block content %}
-<div class="main">
-  <div class="d-flex mb-3">
-    <h2 class="flex-grow-1"><i class="bi bi-server me-1"></i> Servers</h2>
-    <button id="addSrv" class="btn btn-primary">
-      <i class="bi bi-plus-lg"></i> Add New Server
-    </button>
-  </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-server me-2"></i>Server IP Management</h2>
+  <button id="addServerBtn" class="btn btn-primary">
+    <i class="bi bi-plus-lg"></i> Add New Server
+  </button>
+</div>
 
-  <div class="card">
-    <div class="card-body p-0">
-      <table id="srvTable" class="table mb-0 w-100">
-        <thead class="table-light">
-          <tr>
-            <th style="display:none">Server</th>
-            <th>Location</th>
-            <th>Description</th>
-            <th>IP</th>
-            <th>MAC</th>
-            <th>Asset Tag</th>
-            <th>Added On</th>
-            <th>Updated By</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+<div class="card">
+  <div class="card-body p-0">
+    <table id="serverIpTable" class="table table-striped mb-0 w-100">
+      <thead class="table-light">
+        <tr>
+          <th>Description</th>
+          <th>Server Name</th>
+          <th>Location</th>
+          <th>IP</th>
+          <th>MAC</th>
+          <th>Asset Tag</th>
+          <th>Added</th>
+          <th>Updated By</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add / Edit Modal -->
+<div class="modal fade" id="serverModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <button type="button" class="btn-close me-2" data-bs-dismiss="modal"></button>
+        <h5 class="modal-title">Add / Edit Server</h5>
+      </div>
+
+      <div class="modal-body">
+        <input type="hidden" id="modalServerId">
+
+        <div class="row mb-3">
+          <div class="col">
+            <label>Server Name</label>
+            <div class="input-group">
+              <input list="serverNames" id="srvName" class="form-control"
+                     placeholder="Type or select server">
+              <button id="addMetaBtn" class="btn btn-outline-secondary">
+                <i class="bi bi-plus-lg"></i>
+              </button>
+            </div>
+            <datalist id="serverNames"></datalist>
+          </div>
+          <div class="col">
+            <label>Location</label>
+            <input list="serverLocs" id="srvLoc" class="form-control"
+                   placeholder="Type or select location">
+            <datalist id="serverLocs"></datalist>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label>Description</label>
+          <textarea id="srvDesc" class="form-control" rows="2"></textarea>
+        </div>
+
+        <div id="srvRows"></div>
+        <button id="srvAddRow" class="btn btn-outline-secondary btn-sm mb-3">
+          + Add IP
+        </button>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button id="srvSave" class="btn btn-primary">Save</button>
+      </div>
+
     </div>
   </div>
+</div>
 
-  <!-- Add/Edit Modal -->
-  <div class="modal fade" id="srvModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Add / Edit Server</h5>
-          <button class="btn-close" data-bs-dismiss="modal"></button>
+<!-- Unified Add Meta Modal -->
+<div class="modal fade" id="newMetaModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <button type="button" class="btn-close me-2" data-bs-dismiss="modal"></button>
+        <h5 class="modal-title">Add Server Name &amp; Location</h5>
+      </div>
+
+      <div class="modal-body">
+        <div class="mb-3">
+          <label>Name</label>
+          <input id="newMetaName" class="form-control" placeholder="Server Name">
         </div>
-
-        <div class="modal-body">
-          <input type="hidden" id="srvId">
-
-          <div class="row mb-3">
-            <div class="col">
-              <label>Server Name</label>
-              <input id="serverName" class="form-control">
-            </div>
-            <div class="col">
-              <label>Location</label>
-              <input id="serverLocation" class="form-control">
-            </div>
-          </div>
-
-          <div class="mb-3">
-            <label>Description</label>
-            <textarea id="serverDescription" class="form-control" rows="2"></textarea>
-          </div>
-
-          <hr>
-          <h6>IP Addresses</h6>
-          <div id="ipList">
-            <!-- default row: IP + MAC + Tag -->
-            <div class="row mb-2 ip-row">
-              <div class="col-3">
-                <input class="form-control ip" placeholder="IP address">
-              </div>
-              <div class="col-3">
-                <input class="form-control mac" placeholder="MAC (optional)">
-              </div>
-              <div class="col-4">
-                <input class="form-control tag" placeholder="Asset Tag (optional)">
-              </div>
-              <div class="col-2 text-end">
-                <button class="btn btn-sm btn-outline-danger remove">×</button>
-              </div>
-            </div>
-          </div>
-          <button id="addIpRow" class="btn btn-outline-secondary btn-sm mb-3">
-            + Add IP
-          </button>
-        </div>
-
-        <div class="modal-footer">
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button id="saveSrvAll" class="btn btn-primary">Save Server</button>
+        <div class="mb-3">
+          <label>Location</label>
+          <input id="newMetaLoc" class="form-control" placeholder="Location">
         </div>
       </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button id="createMeta" class="btn btn-primary">Create</button>
+      </div>
+
     </div>
   </div>
 </div>
 {% endblock %}
 
+
 {% block scripts %}
 {{ super() }}
-
-{% raw %}
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.datatables.net/rowgroup/1.3.0/js/dataTables.rowGroup.min.js"></script>
 
 <script>
-$(function(){
-  // append an IP/MAC/Tag row
-  function addIpRow(ip='', mac='', tag='') {
-    $('#ipList').append(`
-      <div class="row mb-2 ip-row">
-        <div class="col-3"><input class="form-control ip"  placeholder="IP address"      value="${ip}"></div>
-        <div class="col-3"><input class="form-control mac" placeholder="MAC (optional)"    value="${mac}"></div>
-        <div class="col-4"><input class="form-control tag" placeholder="Asset Tag (optional)" value="${tag}"></div>
+let serversCache = [], locsCache = [];
+
+// Load server list & locations
+async function loadServers(){
+  serversCache = await $.getJSON('/api/servers/');
+  $('#serverNames').empty().append(
+    serversCache.map(s=>`<option value="${s.server_name}">`).join('')
+  );
+}
+async function loadLocs(){
+  const flat = await $.getJSON('/api/servers/flat');
+  locsCache = [...new Set(flat.map(r=>r.location))].filter(x=>x);
+  $('#serverLocs').empty().append(
+    locsCache.map(l=>`<option value="${l}">`).join('')
+  );
+}
+
+// Enrich duplicate-IP/server errors
+async function enrichDup(msg) {
+  const m = msg.match(/already assigned to (\w+) #(\d+)/);
+  if (!m) return msg;
+  const [, type, id] = m;
+
+  // Debug: make sure we actually see “device” here
+  console.log("enrichDup got type:", type, "id:", id);
+
+  if (type === 'user') {
+    const u = await $.getJSON(`/api/users/${id}`);
+    return `${msg} (${u.username})`;
+  }
+
+  if (type === 'server') {
+    const s = serversCache.find(x => x.id == id);
+    return `${msg} (${s?.server_name || id})`;
+  }
+
+  // handle devices (or whatever your backend calls them)
+  if (type.startsWith('dev')) {
+    try {
+      // adjust this URL if your devices router is under a different path!
+      const d = await $.getJSON(`/api/devices/${id}`);
+      console.log("enrichDup device payload:", d);
+
+      // try a bunch of possible name fields:
+      const name = d.hostname 
+                 || d.name 
+                 || d.device_name 
+                 || d.label 
+                 || null;
+
+      return name
+        ? `${msg} (${name})`
+        : `${msg} (device #${id})`;  // fallback if no name field
+    } catch (fetchErr) {
+      console.warn("enrichDup device fetch failed:", fetchErr);
+      return `${msg} (device #${id})`;  // fallback on fetch error
+    }
+  }
+
+  return msg;
+}
+
+
+
+
+$(async function(){
+  await loadServers();
+  await loadLocs();
+
+  // DataTable init
+  const table = $('#serverIpTable').DataTable({
+    ajax:{url:'/api/servers/flat',dataSrc:''},
+    columns:[
+      {data:'description'},
+      {data:'server_name'},
+      {data:'location'},
+      {data:'ip_address'},
+      {data:'mac_address',defaultContent:''},
+      {data:'asset_tag',defaultContent:''},
+      {data:'added_on',render:d=>new Date(d).toLocaleString()},
+      {data:'updated_by'},
+      {data:null,orderable:false,render(r){
+        return `
+          <button class="btn btn-sm btn-warning editSrv" data-id="${r.server_id}">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <button class="btn btn-sm btn-danger deleteSrv" data-id="${r.server_id}">
+            <i class="bi bi-trash"></i>
+          </button>`;
+      }}
+    ],
+    rowGroup:{ 
+  dataSrc:'server_id',
+  startRender: rows => {
+    const d = rows.data()[0];
+    // add class="text-start" (or style="text-align:left")
+    return $(`<tr class="fw-bold bg-light"><td colspan="9" class="text-start">`)
+      .text(`${d.server_name} — ${d.location}`);
+  }
+},
+
+    dom:'<"d-flex justify-content-between mb-2"f p>rt<"d-flex justify-content-end mt-2"p>'
+  });
+
+  // IP‐row helper
+  function addSrvRow(ip='',mac='',tag='',id=''){
+    $('#srvRows').append(`
+      <div class="row mb-2 srv-row" data-id="${id}">
+        <div class="col-4">
+          <input class="form-control srv-ip" placeholder="IP" value="${ip}">
+        </div>
+        <div class="col-3">
+          <input class="form-control srv-mac" placeholder="MAC (opt)" value="${mac}">
+        </div>
+        <div class="col-3">
+          <input class="form-control srv-tag" placeholder="Asset Tag (opt)" value="${tag}">
+        </div>
         <div class="col-2 text-end">
-          <button class="btn btn-sm btn-outline-danger remove">×</button>
+          <button class="btn btn-sm btn-danger srv-remove">&times;</button>
         </div>
       </div>`);
   }
 
-  // remove row
-  $(document).on('click','.remove', e => {
-    $(e.currentTarget).closest('.ip-row').remove();
+  // Remove only that row
+  $(document).on('click','.srv-remove',e=>{
+    e.stopPropagation();
+    $(e.currentTarget).closest('.srv-row').remove();
   });
 
-  // DataTable with date renderer
-  const table = $('#srvTable').DataTable({
-    ajax: { url:'/api/servers/flat', dataSrc:'' },
-    columns: [
-      { data:'server_name', visible:false },
-      { data:'location'                 },
-      { data:'description'              },
-      { data:'ip_address',   title:'IP' },
-      { data:'mac_address',  title:'MAC' },
-      { data:'asset_tag',    title:'Asset Tag' },
-      { data:'added_on',     title:'Added On', render: d =>
-          new Date(d).toLocaleString() },
-      { data:'updated_by',   title:'Updated By' },
-      { data:null, orderable:false, render: r => `
-        <button class="btn btn-sm btn-warning me-1"
-                onclick="openSrvEdit(${r.server_id})">
-          <i class="bi bi-pencil"></i>
-        </button>
-        <button class="btn btn-sm btn-danger"
-                onclick="deleteServerIp(${r.ip_id})">
-          <i class="bi bi-trash"></i>
-        </button>` }
-    ],
-    order:[[0,'asc']],
-    rowGroup:{
-      dataSrc:'server_name',
-      startRender:(rows,name)=>{
-        const loc = rows.data().pluck('location')[0];
-        return `
-          <tr class="table-secondary">
-            <td colspan="8" class="fw-bold">${name} — ${loc}</td>
-          </tr>`;
-      },
-      endRender:null
-    }
+  // +Add IP
+  $('#srvAddRow').click(()=>addSrvRow());
+
+  // Open blank modal
+  $('#addServerBtn').click(()=>{
+    $('#modalServerId').val('');
+    $('#srvRows').empty(); addSrvRow();
+    $('#srvName,#srvLoc,#srvDesc').val('');
+    $('#srvSave').off('click').on('click',saveSrv);
+    new bootstrap.Modal('#serverModal').show();
   });
 
-  // show blank modal
-  $('#addSrv').click(()=>{
-    $('#srvId').val('');
-    $('#serverName,#serverLocation,#serverDescription').val('');
-    $('#ipList').empty();
-    addIpRow();
-    $('#saveSrvAll').off().click(saveServer);
-    new bootstrap.Modal('#srvModal').show();
+  // Edit
+  $('#serverIpTable').on('click','.editSrv',function(){
+    openSrv($(this).data('id'));
   });
 
-  // add extra rows
-  $('#addIpRow').click(()=> addIpRow());
+  // Delete
+  $('#serverIpTable').on('click','.deleteSrv',function(){
+    const id = $(this).data('id');
+    if(!confirm('Delete this server?')) return;
+    fetch(`/api/servers/${id}`,{method:'DELETE'})
+      .then(()=>{
+        // remove row from DataTable
+        table.row($(this).closest('tr')).remove().draw();
+      })
+      .catch(()=>alert('Delete failed'));
+  });
 
-  // save server (create or update)
-  async function saveServer(){
-    const sid = $('#srvId').val();
-    const meta = {
-      server_name: $('#serverName').val().trim(),
-      location:    $('#serverLocation').val().trim(),
-      description: $('#serverDescription').val().trim() || null
-    };
+  // Auto‐prefill on name select/input
+  $('#srvName').on('input',async function(){
+    const val=$(this).val().trim();
+    const ex=serversCache.find(x=>x.server_name===val);
+    if(ex) await openSrv(ex.id);
+  });
 
-    // 1) POST or PUT
-    const url = sid ? `/api/servers/${sid}` : '/api/servers';
-    const method = sid ? 'PUT' : 'POST';
-    let resp = await fetch(url,{
-      method, headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(meta)
-    });
-    const data = await resp.json();
-    if (!resp.ok){
-      alert(data.detail||data.error||'Failed saving server');
-      return;
-    }
-    const server = data;
+  // Unified meta‐modal open
+  $('#addMetaBtn').click(()=>{
+    $('#newMetaName,#newMetaLoc').val('');
+    new bootstrap.Modal('#newMetaModal').show();
+  });
 
-    // 2) collect IP entries
-    const newIps = $('.ip-row').map((_,r)=>{
-      const $r=$(r);
-      return {
-        ip_address:  $r.find('.ip').val().trim(),
-        mac_address: $r.find('.mac').val().trim() || null,
-        asset_tag:   $r.find('.tag').val().trim() || null
-      };
-    }).get().filter(x=>x.ip_address);
-
-    // 3) attach IPs
-    if (newIps.length){
-      resp = await fetch(`/api/servers/${server.id}/ips`, {
+  // Create name+loc
+  $('#createMeta').click(async ()=>{
+    const name=$('#newMetaName').val().trim(),
+          loc =$('#newMetaLoc').val().trim();
+    if(!name||!loc) return alert('Both required');
+    try {
+      const res=await fetch('/api/servers/',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(newIps)
+        body: JSON.stringify({server_name:name,location:loc})
       });
-      if (!resp.ok){
-        const err = await resp.json();
-        alert(err.detail||'Failed saving IPs');
-      }
+      if(!res.ok) throw await res.text();
+      const data=await res.json();
+      bootstrap.Modal.getInstance('#newMetaModal').hide();
+      await loadServers(); await loadLocs();
+      // autofill name, location, and id
+      $('#srvName').val(data.server_name);
+      $('#srvLoc').val(data.location);
+      $('#modalServerId').val(data.id);
+    } catch(err){
+      alert('Create failed: '+err);
     }
+  });
 
-    $('#srvModal').modal('hide');
-    table.ajax.reload();
+  // Open with data
+  async function openSrv(id) {
+  const url = `/api/servers/${id}`.replace(/\/+$/, "");
+  const s   = await $.getJSON(url);
+    $('#modalServerId').val(id);
+    $('#srvName').val(s.server_name);
+    $('#srvLoc').val(s.location);
+    $('#srvDesc').val(s.description||'');
+    $('#srvRows').empty();
+    (await $.getJSON(`/api/servers/${id}/ips`))
+      .forEach(p=>addSrvRow(p.ip_address,p.mac_address||'',p.asset_tag||'',p.id));
+    $('#srvSave').off('click').on('click',saveSrv);
+    new bootstrap.Modal('#serverModal').show();
   }
 
-  // load for edit
-  window.openSrvEdit = async sid => {
-    const s = await fetch(`/api/servers/${sid}`)
-                .then(r=>r.json());
-    $('#srvId').val(s.id);
-    $('#serverName').val(s.server_name);
-    $('#serverLocation').val(s.location);
-    $('#serverDescription').val(s.description||'');
-    $('#ipList').empty();
-    s.ips.forEach(ip=> addIpRow(ip.ip_address, ip.mac_address, ip.asset_tag));
-    $('#saveSrvAll').off().click(saveServer);
-    new bootstrap.Modal('#srvModal').show();
-  };
+  // Save handler
+  async function saveSrv(){
+    // hide up front so UI never locks
+    bootstrap.Modal.getInstance('#serverModal').hide();
+    const id   =$('#modalServerId').val();
+    const name =$('#srvName').val().trim();
+    const loc  =$('#srvLoc').val().trim();
+    if(!name||!loc) return alert('Name & location required');
 
-  // delete IP
-  window.deleteServerIp = ipId => {
-    if (!confirm('Delete this IP?')) return;
-    fetch(`/api/servers/ips/${ipId}`, { method:'DELETE' })
-      .then(_=> table.ajax.reload());
-  };
+    // collect IP changes
+    const newRows=[],updRows=[],keep=[];
+    $('.srv-row').each((_,el)=>{
+      const $r=$(el), rid=$r.data('id');
+      const ip=$r.find('.srv-ip').val().trim();
+      if(!ip) throw 'IP required';
+      const obj={ip_address:ip,
+                 mac_address:$r.find('.srv-mac').val()||null,
+                 asset_tag:$r.find('.srv-tag').val()||null};
+      if(rid){obj.id=rid;updRows.push(obj);keep.push(rid);}
+      else newRows.push(obj);
+    });
+
+    try {
+      // create/update server
+      const url = id?`/api/servers/${id}`:'/api/servers/',
+            mtd = id?'PUT':'POST',
+            srvRes = await fetch(url,{
+              method:mtd,
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({
+                server_name:name,
+                location: loc,
+                description:$('#srvDesc').val()
+              })
+            });
+      if(!srvRes.ok) throw await srvRes.text();
+      const data = await srvRes.json(),
+            sid  = data.id;
+
+      // delete removed IPs
+      const orig=await $.getJSON(`/api/servers/${sid}/ips`);
+      await Promise.all(orig.filter(o=>!keep.includes(o.id))
+        .map(o=>fetch(`/api/servers/${sid}/ips/${o.id}`,{method:'DELETE'}))
+      );
+
+      // update existing
+      await Promise.all(updRows.map(o => {
+  const putUrl = `/api/servers/${sid}/ips/${o.id}`.replace(/\/+$/, "");
+  return fetch(putUrl, {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(o)
+  });
+}));
+
+     // add new IPs
+if (newRows.length) {
+  const postUrl = `/api/servers/${sid}/ips`.replace(/\/+$/, "");
+  const resIp = await fetch(postUrl, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(newRows)
+  });
+
+  // if the server returned a 400, extract its {detail: "..."} and throw it
+  if (!resIp.ok) {
+    // try to parse JSON error, fallback to status text
+    let errObj;
+    try {
+      errObj = await resIp.json();
+    } catch {
+      errObj = { detail: resIp.statusText };
+    }
+    throw errObj;
+  }
+}
+
+
+      // reload table
+      table.ajax.reload();
+
+      } catch(err){
+    let msg;
+
+    // 1) If it's our thrown string, use it
+    if (typeof err === 'string') {
+      msg = err;
+
+    // 2) jQuery jqXHR: has responseJSON or responseText
+    } else if (err && typeof err === 'object' && err.readyState !== undefined) {
+      // Try structured JSON first
+      if (err.responseJSON && err.responseJSON.detail) {
+        msg = err.responseJSON.detail;
+      } 
+      // Fallback to parsing the raw text
+      else if (err.responseText) {
+        try {
+          const parsed = JSON.parse(err.responseText);
+          msg = parsed.detail || parsed.message || err.responseText;
+        } catch {
+          msg = err.responseText;
+        }
+      } else {
+        msg = `HTTP ${err.status} ${err.statusText}`;
+      }
+
+    // 3) A standard Error or plain object
+    } else if (err && typeof err === 'object') {
+      msg = err.detail || err.message || JSON.stringify(err);
+
+    // 4) Anything else
+    } else {
+      msg = String(err);
+    }
+
+    alert('Error: ' + msg);
+  }
+
+}
+
 });
 </script>
-{% endraw %}
 {% endblock %}

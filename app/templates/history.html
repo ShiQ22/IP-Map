@@ -94,7 +94,10 @@
         { data: 'mac_address' },
         { data: 'vendor' },
         { data: 'status' },
-        { data: 'scan_time' }
+         {
+    data: 'scan_time',
+    render: d => new Date(d).toLocaleString()
+  }
       ],
       order: [[5,'desc']],
       rowCallback: (row, data) => {

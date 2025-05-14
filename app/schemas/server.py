@@ -1,65 +1,54 @@
-from typing import List, Optional
+# app/schemas/server.py
+
 from datetime import datetime
+from typing import Optional, List
+from pydantic import BaseModel
 
-from pydantic import BaseModel, IPvAnyAddress
-
-#
-# ---- REQUEST BODIES ----
-#
-class IPCreate(BaseModel):
-    ip_address: IPvAnyAddress
+class IPServerCreate(BaseModel):
+    ip_address: str
     mac_address: Optional[str] = None
-    asset_tag: Optional[str] = None
-
+    asset_tag:   Optional[str] = None
 
 class ServerCreate(BaseModel):
     server_name: str
-    location: str
+    location:    str
     description: Optional[str] = None
 
-
-#
-# ---- RESPONSE SCHEMAS ----
-#
-class IPRead(BaseModel):
-    id: int
-    ip_address: IPvAnyAddress
-    mac_address: Optional[str]
-    asset_tag: Optional[str]
+class IPReadServer(BaseModel):
+    id:         int
+    ip_address:str
+    mac_address:Optional[str]
+    asset_tag:  Optional[str]
     created_at: datetime
     updated_at: datetime
+    updated_by_username: Optional[str]
 
     class Config:
         orm_mode = True
-
 
 class ServerRead(BaseModel):
-    id: int
-    server_name: str
-    location: str
+    id:          int
+    server_name:str
+    location:    str
     description: Optional[str]
-    created_at: datetime
-    updated_at: datetime
-    ips: List[IPRead] = []
+    created_at:  datetime
+    updated_at:  datetime
+    ips:         List[IPReadServer] = []
 
     class Config:
         orm_mode = True
 
-
-#
-# ---- FLAT SCHEMA ----
-#
 class ServerFlat(BaseModel):
     server_id:   int
     server_name: str
     location:    str
     description: Optional[str]
     ip_id:       int
-    ip_address:  IPvAnyAddress
+    ip_address:  str
     mac_address: Optional[str]
     asset_tag:   Optional[str]
     added_on:    datetime
-    updated_by:  Optional[int]
+    updated_by:  Optional[str]
 
     class Config:
         orm_mode = True
