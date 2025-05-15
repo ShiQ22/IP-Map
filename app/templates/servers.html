@@ -165,10 +165,7 @@ async function enrichDup(msg) {
     return `${msg} (${u.username})`;
   }
 
-  if (type === 'server') {
-    const s = serversCache.find(x => x.id == id);
-    return `${msg} (${s?.server_name || id})`;
-  }
+  
 
   // handle devices (or whatever your backend calls them)
   if (type.startsWith('dev')) {
@@ -220,9 +217,11 @@ $(async function(){
           <button class="btn btn-sm btn-warning editSrv" data-id="${r.server_id}">
             <i class="bi bi-pencil"></i>
           </button>
-          <button class="btn btn-sm btn-danger deleteSrv" data-id="${r.server_id}">
-            <i class="bi bi-trash"></i>
-          </button>`;
+          <button class="btn btn-sm btn-danger deleteIp"
+                data-srv="${r.server_id}"
+                data-ip="${r.ip_id}">
+          <i class="bi bi-trash"></i>
+        </button>`;
       }}
     ],
     rowGroup:{ 
@@ -281,16 +280,25 @@ $(async function(){
   });
 
   // Delete
-  $('#serverIpTable').on('click','.deleteSrv',function(){
-    const id = $(this).data('id');
-    if(!confirm('Delete this server?')) return;
-    fetch(`/api/servers/${id}`,{method:'DELETE'})
-      .then(()=>{
-        // remove row from DataTable
-        table.row($(this).closest('tr')).remove().draw();
-      })
-      .catch(()=>alert('Delete failed'));
+  // DELETE SINGLE IP
+$('#serverIpTable').on('click','.deleteIp', function(){
+  const srvId = $(this).data('srv');
+  const ipId  = $(this).data('ip');
+  if(!confirm('Delete this IP address?')) return;
+
+  fetch(`/api/servers/${srvId}/ips/${ipId}`, {
+    method: 'DELETE'
+  })
+  .then(response => {
+    if (!response.ok) throw 'Delete failed';
+    // remove only that row
+    table.row( $(this).closest('tr') ).remove().draw();
+  })
+  .catch(err => {
+    alert(typeof err === 'string' ? err : 'Delete IP failed');
   });
+});
+
 
   // Auto‐prefill on name select/input
   $('#srvName').on('input',async function(){
@@ -346,12 +354,22 @@ $(async function(){
 
   // Save handler
   async function saveSrv(){
-    // hide up front so UI never locks
-    bootstrap.Modal.getInstance('#serverModal').hide();
-    const id   =$('#modalServerId').val();
-    const name =$('#srvName').val().trim();
-    const loc  =$('#srvLoc').val().trim();
-    if(!name||!loc) return alert('Name & location required');
+    // 1) Grab the actual modal element
+    const modalEl = document.getElementById('serverModal');
+    // 2) Get its Bootstrap instance and hide it
+    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+    modalInstance.hide();
+    // 3) Remove any leftover grey backdrop
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+
+    const id   = $('#modalServerId').val();
+    const name = $('#srvName').val().trim();
+    const loc  = $('#srvLoc').val().trim();
+    if (!name || !loc) {
+      // if you bail out here, you might want to re-show the modal:
+      modalInstance.show();
+      return alert('Name & location required');
+    }
 
     // collect IP changes
     const newRows=[],updRows=[],keep=[];

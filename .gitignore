@@ -1,0 +1,17 @@
+# Ignore Python virtualenv
+.venv/
+
+# Ignore byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignore Alembic migration caches
+migrations/**/__pycache__/
+
+# Ignore log files
+*.log
+
+# Byte-compiled / cache
+**/__pycache__/
+*.py[cod]
