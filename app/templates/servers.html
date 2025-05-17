@@ -211,7 +211,20 @@ $(async function(){
       {data:'mac_address',defaultContent:''},
       {data:'asset_tag',defaultContent:''},
       {data:'added_on',render:d=>new Date(d).toLocaleString()},
-      {data:'updated_by'},
+      {
+    data: null,
+    render: r => {
+      const name = r.updated_by || '—';
+      const time = r.updated_at
+        ? new Date(r.updated_at).toLocaleString()
+        : '';
+      return `
+        ${name}
+        <br>
+        <small class="text-muted">${time}</small>
+      `;
+    }
+  },
       {data:null,orderable:false,render(r){
         return `
           <button class="btn btn-sm btn-warning editSrv" data-id="${r.server_id}">
@@ -242,8 +255,16 @@ $(async function(){
     $('#srvRows').append(`
       <div class="row mb-2 srv-row" data-id="${id}">
         <div class="col-4">
-          <input class="form-control srv-ip" placeholder="IP" value="${ip}">
-        </div>
+        <input
+          type="text"
+          class="form-control srv-ip"
+          placeholder="IPv4 (e.g. 192.168.0.1)"
+          pattern="^(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(\\.(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}$"
+          title="Please enter a valid IPv4 address"
+          value="${ip}"
+          required
+        >
+      </div>
         <div class="col-3">
           <input class="form-control srv-mac" placeholder="MAC (opt)" value="${mac}">
         </div>
@@ -385,43 +406,50 @@ $('#serverIpTable').on('click','.deleteIp', function(){
     }
 
     // collect IP changes
-    const newRows=[],updRows=[],keep=[];
-    $('.srv-row').each((_,el)=>{
-  const $r = $(el);
-  const rid = $r.data('id');
+const newRows = [], updRows = [], keep = [];
+
+// precompile once
+const ipv4Regex = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+
+for (const el of document.querySelectorAll('.srv-row')) {
+  const $r   = $(el);
+  const rid  = $r.data('id');
   const ipNew  = $r.find('.srv-ip').val().trim();
   const macNew = $r.find('.srv-mac').val().trim();
   const tagNew = $r.find('.srv-tag').val().trim();
-  if (!ipNew) throw 'IP required';
 
-  // if it's an existing row…
-  if (rid) {
-    // pull the originals
-    const ipOld  = $r.attr('data-original-ip')   || '';
-    const macOld = $r.attr('data-original-mac')  || '';
-    const tagOld = $r.attr('data-original-tag')  || '';
+  // skip untouched rows
+  if (!rid && !ipNew && !macNew && !tagNew) continue;
 
-    // only send a PUT if something changed
-    if (ipNew !== ipOld || macNew !== macOld || tagNew !== tagOld) {
-      updRows.push({
-        id:          rid,
-        ip_address:  ipNew,
-        mac_address: macNew || null,
-        asset_tag:   tagNew || null
-      });
-    }
-    // in all cases, preserve this row
-    keep.push(rid);
-
-  } else {
-    // brand-new row
-    newRows.push({
-      ip_address:  ipNew,
-      mac_address: macNew || null,
-      asset_tag:   tagNew || null
-    });
+  // require IP
+  if (!ipNew) {
+    alert('IP is required');
+    $r.find('.srv-ip').focus();
+    return;
   }
-});
+
+  // enforce IPv4 format
+  if (!ipv4Regex.test(ipNew)) {
+    alert(`"${ipNew}" is not a valid IPv4 address.`);
+    $r.find('.srv-ip').focus();
+    return;
+  }
+
+  // then collect
+  const obj = {
+    ip_address:  ipNew,
+    mac_address: macNew || null,
+    asset_tag:   tagNew || null
+  };
+  if (rid) {
+    obj.id = rid;
+    updRows.push(obj);
+    keep.push(rid);
+  } else {
+    newRows.push(obj);
+  }
+}
+
 
 
     try {

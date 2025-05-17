@@ -137,20 +137,33 @@
       }
     });
 
-  // 2) Delete Range
-  document.querySelectorAll('.delete-range').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.dataset.id;
-      if (!confirm('Delete this range?')) return;
-      try {
-        const res = await fetch(`/api/ranges/${id}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error(await res.text());
-        reload();
-      } catch (err) {
-        alert('Error deleting range: ' + err);
+  // 2) Delete Range — remove the <li> instead of reloading
+document.querySelectorAll('.delete-range').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const id = btn.dataset.id;
+    if (!confirm('Delete this range?')) return;
+    try {
+      const res = await fetch(`/api/ranges/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await res.text());
+
+      // Fade out and remove just this list item
+      const li = btn.closest('li');
+      li.style.transition = 'opacity 0.3s';
+      li.style.opacity = 0;
+      setTimeout(() => li.remove(), 300);
+
+      // If the list is now empty, show the placeholder message
+      if (!document.querySelectorAll('#range-list li').length) {
+        document.getElementById('range-list').innerHTML =
+          '<li class="list-group-item"><em>No IP ranges yet.</em></li>';
       }
-    });
+
+    } catch (err) {
+      alert('Error deleting range: ' + err);
+    }
   });
+});
+
 
   // 3) Create Admin
   document

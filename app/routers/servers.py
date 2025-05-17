@@ -125,7 +125,8 @@ async def flat_list(db: AsyncSession = Depends(get_db)):
             mac_address = ip.mac_address,
             asset_tag   = ip.asset_tag,
             added_on    = ip.created_at,
-            updated_by  = updater
+            updated_by  = updater,
+            updated_at  = ip.updated_at 
         ))
     return out
 

@@ -62,14 +62,12 @@ async def update_range(
     dependencies=[Depends(require_admin)],
 )
 async def delete_range(rid: int, db: AsyncSession = Depends(get_db)):
-    # 1) fetch the range
     ip_range = await db.get(IPRange, rid)
     if not ip_range:
         raise HTTPException(status_code=404, detail="Not found")
 
-    # 2) soft-delete
-    ip_range.active = False
+    # 1) delete the object
+    await db.delete(ip_range)
 
-    # 3) persist
+    # 2) persist immediately
     await db.commit()
-    # nothing to return (204)

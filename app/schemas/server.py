@@ -49,6 +49,7 @@ class ServerFlat(BaseModel):
     asset_tag:   Optional[str]
     added_on:    datetime
     updated_by:  Optional[str]
+    updated_at:  datetime
 
     class Config:
         orm_mode = True

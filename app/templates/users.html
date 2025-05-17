@@ -210,7 +210,20 @@ $(async function init() {
       { data: 'mac_address', defaultContent: '' },
       { data: 'asset_tag',    defaultContent: '' },
       { data: 'created_at',   render: d => new Date(d).toLocaleString() },
-      { data: 'updated_by_username' },
+       {
+    data:   null,
+    render: r => {
+      const name = r.updated_by_username || '—';
+      const dt   = r.updated_at
+        ? new Date(r.updated_at).toLocaleString()
+        : '';
+      return `
+        ${name}
+        <br>
+        <small class="text-muted">${dt}</small>
+      `;
+    }
+  },
       {
         data:     null,
         orderable:false,
@@ -322,7 +335,18 @@ $('#saveNewUser').on('click', async () => {
               .map(x => `<option${x===dev?' selected':''}>${x}</option>`).join('')
           }</select>
         </div>
-        <div class="col-4"><input class="form-control ui-ip" placeholder="IP" value="${ip}"></div>
+        <div class="col-4">
+  <input
+    type="text"
+    class="form-control ui-ip"
+    placeholder="IPv4 (e.g. 192.168.0.1)"
+    pattern="^(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(\\.(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}$"
+    title="Please enter a valid IPv4 address (e.g. 192.168.0.1)"
+    value="${ip}"
+    required
+  >
+</div>
+
         <div class="col-3"><input class="form-control ui-mac" placeholder="MAC (opt)" value="${mac}"></div>
         <div class="col-2"><input class="form-control ui-tag" placeholder="Asset Tag (opt)" value="${tag}"></div>
         <div class="col-1 text-end"><button class="btn btn-sm btn-danger ui-remove">&times;</button></div>
@@ -365,28 +389,54 @@ async function saveEntry() {
     if (!dept) throw 'Department is required';
 
     const newRows = [], updRows = [], keep = [];
-    $('.ui-row').each((_,el) => {
-      const row$ = $(el),
-            id   = row$.data('id'),
-            ip   = row$.find('.ui-ip').val().trim();
-      if (!ip) throw 'IP is required';
-      const mac = row$.find('.ui-mac').val().trim(),
-            tag = row$.find('.ui-tag').val().trim();
-      const obj = {
-        department:  dept,
-        device_type: row$.find('.ui-dev').val(),
-        ip_address:  ip,
-        mac_address: mac || null,
-        asset_tag:   tag || null
-      };
-      if (id) {
-        obj.id = id;
-        updRows.push(obj);
-        keep.push(id);
-      } else {
-        newRows.push(obj);
-      }
-    });
+
+// Precompile IPv4 regex once
+const ipv4Regex = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+
+for (const el of document.querySelectorAll('.ui-row')) {
+  const row$ = $(el);
+  const id   = row$.data('id');
+  const ip   = row$.find('.ui-ip').val().trim();
+  const mac  = row$.find('.ui-mac').val().trim();
+  const tag  = row$.find('.ui-tag').val().trim();
+
+  // 1) Skip untouched blank rows
+  if (!id && !ip && !mac && !tag) {
+    continue;
+  }
+
+  // 2) Require IP on any touched row
+  if (!ip) {
+    alert('IP is required');
+    row$.find('.ui-ip').focus();
+    return;   // abort saveEntry early
+  }
+
+  // 3) Validate IPv4 format
+  if (!ipv4Regex.test(ip)) {
+    alert(`"${ip}" is not a valid IPv4 address.`);
+    row$.find('.ui-ip').focus();
+    return;   // abort saveEntry early
+  }
+
+  // 4) Build the object for create/update
+  const obj = {
+    department:  dept,
+    device_type: row$.find('.ui-dev').val(),
+    ip_address:  ip,
+    mac_address: mac || null,
+    asset_tag:   tag || null
+  };
+
+  if (id) {
+    obj.id = id;
+    updRows.push(obj);
+    keep.push(id);
+  } else {
+    newRows.push(obj);
+  }
+}
+
 
     const orig = await $.getJSON(`/api/users/${uid}/ips`);
     await Promise.all(

@@ -89,16 +89,23 @@
         }
       },
       columns: [
-        { data: 'ip' },
-        { data: 'hostname' },
-        { data: 'mac_address' },
-        { data: 'vendor' },
-        { data: 'status' },
-         {
+  { data: 'ip' },
+  { data: 'hostname' },
+  { data: 'mac_address' },
+  { data: 'vendor' },
+  { data: 'status' },
+  {
     data: 'scan_time',
-    render: d => new Date(d).toLocaleString()
+    // let DataTables know it's numeric for ordering
+    type: 'num',
+    render: {
+      // what the user sees
+      display: d => new Date(d).toLocaleString(),
+      // what DataTables uses to sort
+      sort:    d => new Date(d).getTime()
+    }
   }
-      ],
+],
       order: [[5,'desc']],
       rowCallback: (row, data) => {
         $(row)

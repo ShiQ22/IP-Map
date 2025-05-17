@@ -56,16 +56,28 @@ async def _get_ip_row(db: AsyncSession, dev_id: int) -> IP | None:
 
 
 async def _enrich(dev: Device, db: AsyncSession) -> DeviceRead:
-    admin = await db.get(Admin, dev.updated_by) if dev.updated_by else None
-    ip    = await _get_ip_row(db, dev.id)
-    base  = DeviceRead.from_orm(dev)
+    # 1) Fetch the IP child record
+    ip = await _get_ip_row(db, dev.id)
+
+    # 2) Look up the admin who last updated *that* IP row
+    admin = None
+    if ip and ip.updated_by:
+        admin = await db.get(Admin, ip.updated_by)
+
+    # 3) Build the Base DeviceRead from the Device itself
+    base = DeviceRead.from_orm(dev)
+
+    # 4) Overlay IP fields plus the IP’s updated_by username and updated_at timestamp
     return base.copy(update={
         "device_type":         ip.device_type        if ip else None,
         "ip_address":          ip.ip_address         if ip else None,
         "mac_address":         ip.mac_address        if ip else None,
         "asset_tag":           ip.asset_tag          if ip else None,
         "updated_by_username": admin.username        if admin else None,
+        # use the IP row’s updated_at so every IP change bumps this
+        "updated_at":          ip.updated_at         if ip else dev.updated_at,
     })
+
 
 
 # ─────────── routes ───────────
@@ -191,8 +203,10 @@ async def update_device(
         await db.rollback()
         raise HTTPException(400, "Hostname already exists")
 
-    return await _enrich(dev, db)
+    # ←── ADD THIS LINE ──→
+    await db.refresh(dev)
 
+    return await _enrich(dev, db)
 
 @router.delete(
     "/{dev_id}",
