@@ -254,11 +254,6 @@ $(async function(){
           <button class="btn btn-sm btn-danger srv-remove">&times;</button>
         </div>
       </div>`);
-      const $last = $('#srvRows .srv-row').last();
-  $last
-    .attr('data-original-ip',   ip)
-    .attr('data-original-mac',  mac)
-    .attr('data-original-tag',  tag);
   }
 
   // Remove only that row
@@ -352,15 +347,7 @@ $('#serverIpTable').on('click','.deleteIp', function(){
     $('#srvDesc').val(s.description||'');
     $('#srvRows').empty();
     (await $.getJSON(`/api/servers/${id}/ips`))
-      .forEach(p=>{
-  addSrvRow(p.ip_address, p.mac_address||'', p.asset_tag||'', p.id);
-  // ▼ now set originals on the freshly-added row
-  const $r = $('#srvRows .srv-row').last();
-  $r
-    .attr('data-original-ip',   p.ip_address)
-    .attr('data-original-mac',  p.mac_address||'')
-    .attr('data-original-tag',  p.asset_tag||'');
-});
+      .forEach(p=>addSrvRow(p.ip_address,p.mac_address||'',p.asset_tag||'',p.id));
     $('#srvSave').off('click').on('click',saveSrv);
     new bootstrap.Modal('#serverModal').show();
   }
@@ -387,42 +374,15 @@ $('#serverIpTable').on('click','.deleteIp', function(){
     // collect IP changes
     const newRows=[],updRows=[],keep=[];
     $('.srv-row').each((_,el)=>{
-  const $r = $(el);
-  const rid = $r.data('id');
-  const ipNew  = $r.find('.srv-ip').val().trim();
-  const macNew = $r.find('.srv-mac').val().trim();
-  const tagNew = $r.find('.srv-tag').val().trim();
-  if (!ipNew) throw 'IP required';
-
-  // if it's an existing row…
-  if (rid) {
-    // pull the originals
-    const ipOld  = $r.attr('data-original-ip')   || '';
-    const macOld = $r.attr('data-original-mac')  || '';
-    const tagOld = $r.attr('data-original-tag')  || '';
-
-    // only send a PUT if something changed
-    if (ipNew !== ipOld || macNew !== macOld || tagNew !== tagOld) {
-      updRows.push({
-        id:          rid,
-        ip_address:  ipNew,
-        mac_address: macNew || null,
-        asset_tag:   tagNew || null
-      });
-    }
-    // in all cases, preserve this row
-    keep.push(rid);
-
-  } else {
-    // brand-new row
-    newRows.push({
-      ip_address:  ipNew,
-      mac_address: macNew || null,
-      asset_tag:   tagNew || null
+      const $r=$(el), rid=$r.data('id');
+      const ip=$r.find('.srv-ip').val().trim();
+      if(!ip) throw 'IP required';
+      const obj={ip_address:ip,
+                 mac_address:$r.find('.srv-mac').val()||null,
+                 asset_tag:$r.find('.srv-tag').val()||null};
+      if(rid){obj.id=rid;updRows.push(obj);keep.push(rid);}
+      else newRows.push(obj);
     });
-  }
-});
-
 
     try {
       // create/update server

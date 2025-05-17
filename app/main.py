@@ -1,5 +1,10 @@
 # app/main.py
 
+
+from pydantic.json import ENCODERS_BY_TYPE
+from datetime import datetime, timezone
+# -- ensure all datetimes are emitted as UTC ISO strings with offset --
+ENCODERS_BY_TYPE[datetime] = lambda dt: dt.astimezone(timezone.utc).isoformat()
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, JSONResponse

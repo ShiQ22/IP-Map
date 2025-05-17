@@ -52,17 +52,18 @@
   <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
   <script>
   $(function(){
-    let ajaxParam = "";
+    // Load the last‐used filter from localStorage (or empty)
+    let ajaxParam = localStorage.getItem('lastNets') || "";
 
-    // Initialize DataTable once
+    // Initialize DataTable
     const table = $('#devTable').DataTable({
       pageLength: 100,
       ajax: {
         url: '/api/live',
         dataSrc: '',
-        cache: false,           // disable caching
-        traditional: true, 
-        data: function(d) {     // attach nets[] params if set
+        cache: false,
+        traditional: true,
+        data: d => {
           if (ajaxParam) {
             d.nets = ajaxParam.split(',');
           }
@@ -76,7 +77,7 @@
         { data: 'status' },
         {
           data: 'last_checked',
-          render: d => new Date(d).toLocaleString()   // friendly timestamp
+          render: d => new Date(d).toLocaleString()
         }
       ],
       rowCallback: (row, data) => {
@@ -87,12 +88,22 @@
       order: [[0, 'asc']]
     });
 
-    // Kick off a scan then reload the table
+    // If we have a saved filter, pre‐check the boxes and reload the table once
+    if (ajaxParam) {
+      ajaxParam.split(',').forEach(net => {
+        $(`.dropdown-menu input[value="${net}"]`).prop('checked', true);
+      });
+      table.ajax.reload();
+    }
+
+    // Scan function
     function startScan(nets){
-      const msg = nets.length
-        ? `Scanning ranges: ${nets.join(', ')}…`
-        : 'Scanning all ranges…';
-      $('#loading').text(msg).show();
+      $('#loading').text(
+        nets.length
+          ? `Scanning ranges: ${nets.join(', ')}…`
+          : 'Scanning all ranges…'
+      ).show();
+
       fetch('/api/live/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -102,17 +113,18 @@
         if (!res.ok) throw new Error(`Scan failed ${res.status}`);
       })
       .then(() => {
-        // remember which nets we scanned
+        // remember and persist the current filter
         ajaxParam = nets.join(',');
-        // reload the DataTable with fresh data
+        localStorage.setItem('lastNets', ajaxParam);
         table.ajax.reload();
       })
       .catch(err => alert('Scan error: ' + err))
       .finally(() => {
-        $('#loading').text('⏳ Scanning…').hide();
+        $('#loading').hide();
       });
     }
 
+    // Button handlers
     $('#scanAll').click(() => startScan([]));
     $('#scanCustom').click(() => {
       const chosen = $('.dropdown-menu input:checked')
