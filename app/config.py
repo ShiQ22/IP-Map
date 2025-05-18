@@ -34,6 +34,13 @@ class Settings(BaseSettings):
             f"@{self.mysql_host}:{self.mysql_port}/{self.mysql_db}"
         )
 
+# URL where the Snipe-IT UI lives:
+    SNIPE_UI:    str
+    # Base URL for the Snipe-IT API:
+    SNIPE_API:   str
+    # Personal API token generated in Snipe-IT (Settings → API):
+    SNIPE_TOKEN: str
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

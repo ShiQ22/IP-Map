@@ -9,6 +9,15 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.templating import Jinja2Templates
+
+templates = Jinja2Templates(directory="app/templates")
+
+from app.snipe import get_hardware_id
+from app.config import settings
+
+templates.env.globals['get_hardware_id'] = get_hardware_id
+templates.env.globals['SNIPE_UI']       = settings.SNIPE_UI
 
 from app.config import settings
 from app.routers.admins import router as admins_router

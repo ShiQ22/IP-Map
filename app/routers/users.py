@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 import csv, io
 from typing import List
+from app.config import settings
+from app.snipe import get_hardware_id
 
 from app.database import get_db
 from app.models import User, IP, OwnerType, Admin
@@ -103,16 +105,29 @@ async def import_users(file: UploadFile = File(...),
 
 # ───────────────────────  HELPER  ───────────────────────────────────── #
 
+from app.config import settings
+from app.snipe import get_hardware_id
+
 def as_ipread(ip: IP, *, owner: User, updater_name: str | None) -> IPRead:
     if ip.department is None:
         ip.department = ""
     base = IPRead.from_orm(ip)
+
+    # 1) lookup numeric ID (cached)
+    hw_id = get_hardware_id(ip.asset_tag or "")
+
+    # 2) build the full Snipe-IT URL (or None)
+    snipe_url = f"{settings.SNIPE_UI}/hardware/{hw_id}" if hw_id else None
+
+    # 3) merge into the Pydantic model
     return base.copy(update={
         "department":           ip.department,
         "owner_username":       owner.username,
         "owner_naos_id":        owner.naos_id,
         "updated_by_username":  updater_name,
+        "snipe_url":            snipe_url,   # now defined!
     })
+
 
 # ─────────────────────  USER-SCOPED IP ENDPOINTS  ───────────────────── #
 

@@ -50,6 +50,6 @@ class IPRead(IPBase):
     owner_username:       Optional[str] = None
     owner_naos_id:        Optional[str] = None
     updated_by_username:  Optional[str] = None
-
+    snipe_url:            Optional[str] = None
     class Config:
         orm_mode = True

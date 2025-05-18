@@ -9,6 +9,8 @@ from sqlalchemy.exc import IntegrityError
 from typing import List          
 from fastapi import status  
 from app.database import get_db
+from app.config import settings
+from app.snipe   import get_hardware_id
 from app.models import IP, User, Device, Server, Admin, OwnerType
 from app.schemas.ips import IPCreate, IPRead, IPUserCreate
 from app.utils.security import require_viewer_or_admin, require_admin
@@ -33,12 +35,16 @@ async def list_all_user_ips(db: AsyncSession = Depends(get_db)):
 
 # ─────────────────────────────  HELPERS  ──────────────────────────────────── #
 
+from app.config import settings
+from app.snipe   import get_hardware_id
+
 async def enrich_row(ip: IP, db: AsyncSession) -> IPRead:
     """
     Build an `IPRead` object and include:
       - owner_username / owner_naos_id for users,
       - hostname for devices/servers,
-      - plus the admin username who last updated.
+      - plus the admin username who last updated,
+      - and snipe_url if asset_tag exists in Snipe-IT.
     """
     updater = await db.get(Admin, ip.updated_by) if ip.updated_by else None
     if ip.department is None:
@@ -69,14 +75,21 @@ async def enrich_row(ip: IP, db: AsyncSession) -> IPRead:
         owner_username = None
         owner_naos_id  = None
 
+    # 1) Base Pydantic conversion
     base = IPRead.from_orm(ip)
-    return base.copy(update={
-        "department":          ip.department,
-        "owner_username":      owner_username,
-        "owner_naos_id":       owner_naos_id,
-        "updated_by_username": updater.username if updater else None,
-    })
 
+    # 2) Lookup Snipe-IT hardware ID (cached) and build full URL (or None)
+    hw_id     = get_hardware_id(ip.asset_tag or "")
+    snipe_url = f"{settings.SNIPE_UI}/hardware/{hw_id}" if hw_id else None
+
+    # 3) Return enriched model including snipe_url
+    return base.copy(update={
+        "department":           ip.department,
+        "owner_username":       owner_username,
+        "owner_naos_id":        owner_naos_id,
+        "updated_by_username":  updater.username if updater else None,
+        "snipe_url":            snipe_url,
+    })
 
 # ─────────────────────────  GLOBAL IP CRUD  ──────────────────────────────── #
 

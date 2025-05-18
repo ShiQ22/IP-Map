@@ -11,7 +11,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from typing import List
-
+from app.config import settings
+from app.snipe import get_hardware_id
 from app.database import get_db
 from app.models import Server, IP, OwnerType, Admin
 from app.schemas.server import (
@@ -115,6 +116,9 @@ async def flat_list(db: AsyncSession = Depends(get_db)):
     )
     out: List[ServerFlat] = []
     for ip, srv, updater in q.all():
+         # lookup numeric hardware ID (cached)
+        hw_id = get_hardware_id(ip.asset_tag or "")
+        url   = f"{settings.SNIPE_UI}/hardware/{hw_id}" if hw_id else None
         out.append(ServerFlat(
             server_id   = srv.id,
             server_name = srv.server_name,
@@ -124,6 +128,7 @@ async def flat_list(db: AsyncSession = Depends(get_db)):
             ip_address  = ip.ip_address,
             mac_address = ip.mac_address,
             asset_tag   = ip.asset_tag,
+            snipe_url   = url,
             added_on    = ip.created_at,
             updated_by  = updater,
             updated_at  = ip.updated_at 
@@ -182,6 +187,9 @@ async def get_server(
 def _as_ip(ip: IP, updater: str | None) -> IPReadServer:
     rec = IPReadServer.from_orm(ip)
     rec.updated_by_username = updater
+    # newline below to set the link
+    hw_id = get_hardware_id(ip.asset_tag or "")
+    rec.snipe_url = f"{settings.SNIPE_UI}/hardware/{hw_id}" if hw_id else None
     return rec
 
 

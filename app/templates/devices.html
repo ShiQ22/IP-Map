@@ -364,7 +364,19 @@ $(async function(){
       { data:'hostname' },
       { data:'ip_address' },
       { data:'mac_address', defaultContent:'' },
-      { data:'asset_tag',   defaultContent:'' },
+      {
+  data: 'asset_tag',
+  defaultContent: '',
+  render: function(data, type, row) {
+    // If our API returned a URL, wrap it in an <a>
+    if (row.snipe_url) {
+      return `<a href="${row.snipe_url}" target="_blank">${data}</a>`;
+    }
+    // Otherwise just show the tag text (or blank)
+    return data || '';
+  }
+},
+
       { data:'created_at', render: d => new Date(d).toLocaleString() },
        {
     data:   null,

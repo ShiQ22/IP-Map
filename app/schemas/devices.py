@@ -43,6 +43,6 @@ class DeviceRead(DeviceBase):
 
     created_at: datetime
     updated_at: datetime
-
+    snipe_url: Optional[str] = None
     class Config:
         orm_mode = True

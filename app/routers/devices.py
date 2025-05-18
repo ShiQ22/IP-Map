@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
-
+from app.snipe import get_hardware_id
 from app.database import get_db
 from app.models import Device, Admin, IP, OwnerType
 from app.schemas.devices import DeviceCreate, DeviceRead
@@ -16,7 +16,7 @@ from app.utils.security import (
 import csv, io
 from fastapi import UploadFile, File, status, Depends
 from typing import List
-
+from app.config import settings
 router = APIRouter(prefix="/devices", tags=["devices"])
 
 
@@ -87,8 +87,28 @@ async def _enrich(dev: Device, db: AsyncSession) -> DeviceRead:
     dependencies=[Depends(require_viewer_or_admin)],
 )
 async def list_devices(db: AsyncSession = Depends(get_db)):
+    # 1) fetch raw Device rows
     rows = (await db.execute(select(Device))).scalars().all()
-    return [await _enrich(d, db) for d in rows]
+
+    out = []
+    for d in rows:
+        # 2) your existing enrich (turns DB model into Pydantic model or dict)
+        enriched = await _enrich(d, db)
+
+        # 3) lookup the numeric Snipe-IT ID (cached)
+        tag = getattr(enriched, "asset_tag", None) or ""
+        hw_id = get_hardware_id(tag)
+
+        # 4) turn the Pydantic model into a dict so we can add a field
+        item = enriched.dict()
+        item["snipe_url"] = (
+            f"{settings.SNIPE_UI}/hardware/{hw_id}"
+            if hw_id else None
+        )
+
+        out.append(item)
+
+    return out
 
 
 @router.get(

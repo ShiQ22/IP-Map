@@ -208,7 +208,16 @@ $(async function init() {
       { data: 'device_type' },
       { data: 'ip_address' },
       { data: 'mac_address', defaultContent: '' },
-      { data: 'asset_tag',    defaultContent: '' },
+      {
+  data: 'asset_tag',
+  defaultContent: '',
+  render: function(data, type, row) {
+    if (row.snipe_url) {
+      return `<a href="${row.snipe_url}" target="_blank">${data}</a>`;
+    }
+    return data || '';
+  }
+},
       { data: 'created_at',   render: d => new Date(d).toLocaleString() },
        {
     data:   null,

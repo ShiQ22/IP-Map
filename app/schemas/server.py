@@ -19,6 +19,7 @@ class IPReadServer(BaseModel):
     ip_address:str
     mac_address:Optional[str]
     asset_tag:  Optional[str]
+    snipe_url:  Optional[str]        # ← new!
     created_at: datetime
     updated_at: datetime
     updated_by_username: Optional[str]
@@ -50,6 +51,6 @@ class ServerFlat(BaseModel):
     added_on:    datetime
     updated_by:  Optional[str]
     updated_at:  datetime
-
+    snipe_url:  Optional[str]        # ← new!
     class Config:
         orm_mode = True
