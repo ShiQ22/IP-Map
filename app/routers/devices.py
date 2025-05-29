@@ -92,14 +92,21 @@ async def list_devices(db: AsyncSession = Depends(get_db)):
 
     out = []
     for d in rows:
-        # 2) your existing enrich (turns DB model into Pydantic model or dict)
         enriched = await _enrich(d, db)
 
-        # 3) lookup the numeric Snipe-IT ID (cached)
-        tag = getattr(enriched, "asset_tag", None) or ""
-        hw_id = get_hardware_id(tag)
+        # 1) grab the IP row so we can cache/peek its snipe_id
+        ip = await _get_ip_row(db, d.id)
 
-        # 4) turn the Pydantic model into a dict so we can add a field
+        # 2) if we haven’t cached it yet, look it up now and persist
+        if ip and ip.snipe_id is None:
+            hw = get_hardware_id(ip.asset_tag or "")
+            if hw:
+                ip.snipe_id = hw
+                await db.commit()
+        # 3) now either way read it
+        hw_id = ip.snipe_id if ip else None
+
+        # 4) build the URL from that cached value
         item = enriched.dict()
         item["snipe_url"] = (
             f"{settings.SNIPE_UI}/hardware/{hw_id}"
@@ -107,6 +114,7 @@ async def list_devices(db: AsyncSession = Depends(get_db)):
         )
 
         out.append(item)
+
 
     return out
 
@@ -223,10 +231,32 @@ async def update_device(
         await db.rollback()
         raise HTTPException(400, "Hostname already exists")
 
-    # ←── ADD THIS LINE ──→
+    # 1) make sure our Device object is fresh
     await db.refresh(dev)
 
-    return await _enrich(dev, db)
+    # 2) grab the IP row so we can cache/peek its snipe_id
+    ip = await _get_ip_row(db, dev.id)
+
+    # 3) if not yet cached, look it up now and persist
+
+    hw = get_hardware_id(ip.asset_tag or "")
+    if hw:
+        ip.snipe_id = hw
+        await db.commit()
+        await db.refresh(ip)
+
+    # 4) now read whichever snipe_id we have
+    hw_id = ip.snipe_id if ip else None
+
+    # 5) enrich the device and inject the same snipe_url field
+    enriched = await _enrich(dev, db)
+    data = enriched.dict()
+    data["snipe_url"] = (
+        f"{settings.SNIPE_UI}/hardware/{hw_id}"
+        if hw_id else None
+    )
+
+    return data
 
 @router.delete(
     "/{dev_id}",

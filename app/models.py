@@ -81,7 +81,7 @@ class IP(Base, TimestampMixin):
     ip_address   = Column(String(45), nullable=False)
     mac_address  = Column(String(50), nullable=True)
     asset_tag    = Column(String(50), nullable=True)
-
+    snipe_id     = Column(Integer, nullable=True)
     # Fields for User-IP Management (and also used by devices/servers)
     department = Column(String(100), nullable=False, default="", server_default="")
     device_type  = Column(SQLEnum(DeviceType), nullable=False, default=DeviceType.other)

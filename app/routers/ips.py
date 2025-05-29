@@ -44,7 +44,7 @@ async def enrich_row(ip: IP, db: AsyncSession) -> IPRead:
       - owner_username / owner_naos_id for users,
       - hostname for devices/servers,
       - plus the admin username who last updated,
-      - and snipe_url if asset_tag exists in Snipe-IT.
+      - and snipe_url if asset_tag exists in Snipe-IT (cached).
     """
     updater = await db.get(Admin, ip.updated_by) if ip.updated_by else None
     if ip.department is None:
@@ -78,11 +78,22 @@ async def enrich_row(ip: IP, db: AsyncSession) -> IPRead:
     # 1) Base Pydantic conversion
     base = IPRead.from_orm(ip)
 
-    # 2) Lookup Snipe-IT hardware ID (cached) and build full URL (or None)
-    hw_id     = get_hardware_id(ip.asset_tag or "")
+    # 2) Determine Snipe-IT hardware ID, using our new cache column
+    if ip.snipe_id is None:
+        # first time: do the lookup
+        hw_id = get_hardware_id(ip.asset_tag or "")
+        if hw_id:
+            ip.snipe_id = hw_id
+            # persist so future loads skip the remote call
+            await db.commit()
+    else:
+        # already cached
+        hw_id = ip.snipe_id
+
+    # 3) Build full URL (or None)
     snipe_url = f"{settings.SNIPE_UI}/hardware/{hw_id}" if hw_id else None
 
-    # 3) Return enriched model including snipe_url
+    # 4) Return enriched model including snipe_url
     return base.copy(update={
         "department":           ip.department,
         "owner_username":       owner_username,

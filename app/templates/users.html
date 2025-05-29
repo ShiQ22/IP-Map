@@ -212,10 +212,16 @@ $(async function init() {
   data: 'asset_tag',
   defaultContent: '',
   render: function(data, type, row) {
-    if (row.snipe_url) {
+    // only show a link if there's actually a tag to link to
+    if (data && row.snipe_url) {
       return `<a href="${row.snipe_url}" target="_blank">${data}</a>`;
     }
-    return data || '';
+    // if there's a tag but no link, just print the tag
+    if (data) {
+      return data;
+    }
+    // otherwise, print nothing
+    return '';
   }
 },
       { data: 'created_at',   render: d => new Date(d).toLocaleString() },

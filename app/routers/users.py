@@ -108,25 +108,36 @@ async def import_users(file: UploadFile = File(...),
 from app.config import settings
 from app.snipe import get_hardware_id
 
-def as_ipread(ip: IP, *, owner: User, updater_name: str | None) -> IPRead:
+from sqlalchemy.ext.asyncio import AsyncSession
+
+async def as_ipread(ip: IP, db: AsyncSession, *, owner: User, updater_name: str | None) -> IPRead:
     if ip.department is None:
         ip.department = ""
+
+    # Base pydantic conversion
     base = IPRead.from_orm(ip)
 
-    # 1) lookup numeric ID (cached)
-    hw_id = get_hardware_id(ip.asset_tag or "")
+    # 1) If we haven’t cached it yet, look it up and persist
+    if ip.snipe_id is None:
+        hw_id = get_hardware_id(ip.asset_tag or "")
+        if hw_id:
+            ip.snipe_id = hw_id
+            await db.commit()
+    else:
+        hw_id = ip.snipe_id
 
-    # 2) build the full Snipe-IT URL (or None)
+    # 2) Build full URL (or None)
     snipe_url = f"{settings.SNIPE_UI}/hardware/{hw_id}" if hw_id else None
 
-    # 3) merge into the Pydantic model
+    # 3) Inject owner/updater fields plus snipe_url
     return base.copy(update={
         "department":           ip.department,
         "owner_username":       owner.username,
         "owner_naos_id":        owner.naos_id,
         "updated_by_username":  updater_name,
-        "snipe_url":            snipe_url,   # now defined!
+        "snipe_url":            snipe_url,
     })
+
 
 
 # ─────────────────────  USER-SCOPED IP ENDPOINTS  ───────────────────── #
@@ -146,7 +157,10 @@ async def list_user_ips(user_id: int = Path(...),
     out: list[IPRead] = []
     for ip in rows:
         upd = (await db.get(Admin, ip.updated_by)).username if ip.updated_by else None
-        out.append(as_ipread(ip, owner=owner, updater_name=upd))
+
+        # ✅ correct: await the async helper and include `db`
+        out.append(await as_ipread(ip, db, owner=owner, updater_name=upd))
+
     return out
 
 @router.post(
@@ -184,7 +198,9 @@ async def add_user_ips(
             mac_address = e.mac_address,
             asset_tag   = e.asset_tag,
             updated_by  = admin.id
+            
         )
+        ip.snipe_id = None
         db.add(ip)
         created.append(ip)
 
@@ -198,12 +214,14 @@ async def add_user_ips(
         await db.rollback()
         raise HTTPException(status_code=400, detail="Duplicate IP detected during save")
 
-    # 2) build the response
+        # 2) build the response
     out: list[IPRead] = []
     for ip in created:
         await db.refresh(ip)
-        out.append(as_ipread(ip, owner=owner, updater_name=admin.username))
+        # now correctly pass admin.username
+        out.append(await as_ipread(ip, db, owner=owner, updater_name=admin.username))
     return out
+
 
 @router.put("/{user_id}/ips/{ip_id}", response_model=IPRead,
             dependencies=[Depends(require_admin)])
@@ -221,6 +239,7 @@ async def update_user_ip(
     for k, v in entry.dict().items():
         setattr(ip, k, v)
     ip.updated_by = admin.id
+    ip.snipe_id = None
 
     try:
         await db.commit()
@@ -230,7 +249,7 @@ async def update_user_ip(
     await db.refresh(ip)
 
     owner = await db.get(User, user_id)
-    return as_ipread(ip, owner=owner, updater_name=admin.username)
+    return await as_ipread(ip, db, owner=owner, updater_name=admin.username)
 
 @router.delete("/{user_id}/ips/{ip_id}",
                status_code=status.HTTP_204_NO_CONTENT,

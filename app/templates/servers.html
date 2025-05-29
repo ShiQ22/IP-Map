@@ -210,15 +210,21 @@ $(async function(){
       {data:'ip_address'},
       {data:'mac_address',defaultContent:''},
       {
-    data: 'asset_tag',
-    defaultContent: '',
-    render: function(data, type, row) {
-      if (row.snipe_url) {
-        return `<a href="${row.snipe_url}" target="_blank">${data}</a>`;
-      }
-      return data || '';
+  data: 'asset_tag',
+  defaultContent: '',
+  render: function(data, type, row) {
+    // only show a link if there's actually a tag to link to
+    if (data && row.snipe_url) {
+      return `<a href="${row.snipe_url}" target="_blank">${data}</a>`;
     }
-  },
+    // if there's a tag but no link, just print the tag
+    if (data) {
+      return data;
+    }
+    // otherwise, print nothing
+    return '';
+  }
+},
       {data:'added_on',render:d=>new Date(d).toLocaleString()},
       {
     data: null,

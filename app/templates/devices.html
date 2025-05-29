@@ -368,12 +368,16 @@ $(async function(){
   data: 'asset_tag',
   defaultContent: '',
   render: function(data, type, row) {
-    // If our API returned a URL, wrap it in an <a>
-    if (row.snipe_url) {
+    // only show a link if there's actually a tag to link to
+    if (data && row.snipe_url) {
       return `<a href="${row.snipe_url}" target="_blank">${data}</a>`;
     }
-    // Otherwise just show the tag text (or blank)
-    return data || '';
+    // if there's a tag but no link, just print the tag
+    if (data) {
+      return data;
+    }
+    // otherwise, print nothing
+    return '';
   }
 },
 

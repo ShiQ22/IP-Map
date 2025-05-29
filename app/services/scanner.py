@@ -203,14 +203,30 @@ async def scan_cidr(cidr: str, db: AsyncSession) -> None:
         await db.execute(hist)
 
 
-    # 5) Prune old history
-    cutoff = now_dt - datetime.timedelta(days=HISTORY_RETENTION_DAYS)
-    await db.execute(delete(History).where(History.scan_time < cutoff))
-
+async def prune_history(db: AsyncSession) -> None:
+    """
+    Remove history records older than HISTORY_RETENTION_DAYS.
+    Runs as its own transaction to avoid deadlocks.
+    """
+    cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=HISTORY_RETENTION_DAYS)
+    await db.execute(
+        delete(History)
+        .where(History.scan_time < cutoff)
+    )
     await db.commit()
 
+
+
+
+    # 5) Prune old history
+    
+
+    await db.commit()
 
 async def scan_nets(nets: list[str], db: AsyncSession) -> None:
     for cidr in nets:
         await scan_cidr(cidr, db)
         await asyncio.sleep(0.5)
+
+    # 6) Prune old history in its own transaction
+    await prune_history(db)
